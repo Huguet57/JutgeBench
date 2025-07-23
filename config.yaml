@@ -1,0 +1,18 @@
+# Jutge Problem Solver Configuration
+
+openai:
+  model: "gpt-4o-mini"                 # or "gpt-4o" for better results
+  max_tokens: 2000
+  temperature: 0.1
+  timeout: 30
+
+jutge:
+  default_compiler: "Python3"         # Default compiler (Python3, G++17, JDK)
+  submission_timeout: 60
+  max_retries: 3
+
+solver:
+  preferred_languages: ["Python3", "G++17", "JDK"]
+  max_generation_attempts: 3
+  enable_local_testing: true
+  log_level: "INFO"
