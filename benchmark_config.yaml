@@ -38,46 +38,46 @@ models:
 
 problem_sets:
   hello_world:
-    - "P68688"  # Hello world!
+    - "P68688_en"  # Hello world!
 
   basic_algorithms:
-    - "P68688"   # Hello world!
-    - "P62421"   # Three words
-    - "P57548"   # Sum of two integer numbers
-    - "P41221"   # Sum of three integer numbers
-    - "P56118"   # Maximum of two integer numbers
-    - "P52847"   # Maximum of three different integer numbers
-    - "P90615"   # Maximum of three integer numbers
-    - "P15613"   # Temperatures
-    - "P48107"   # Integer division and remainder of two natural numbers
+    - "P68688_en"   # Hello world!
+    - "P62421_en"   # Three words
+    - "P57548_en"   # Sum of two integer numbers
+    - "P41221_en"   # Sum of three integer numbers
+    - "P56118_en"   # Maximum of two integer numbers
+    - "P52847_en"   # Maximum of three different integer numbers
+    - "P90615_en"   # Maximum of three integer numbers
+    - "P15613_en"   # Temperatures
+    - "P48107_en"   # Integer division and remainder of two natural numbers
 
   medium_problems:
-    - "P68688"   # Hello world!
-    - "P62421"   # Three words
-    - "P57548"   # Sum of two integer numbers
-    - "P41221"   # Sum of three integer numbers
-    - "P56118"   # Maximum of two integer numbers
-    - "P90615"   # Maximum of three integer numbers
-    - "P92351"   # Integer division and remainder of an integer number by a natural number
-    - "P98960"   # Uppercase and lowercase letters
-    - "P42042"   # Classification of characters (1)
-    - "P90226"   # Comparison of words
-    - "P92613"   # Rounding
-    - "P37469"   # Time decomposition (1)
-    - "P34279"   # Add one second
-    - "P81629"   # Minimum change
+    - "P68688_en"   # Hello world!
+    - "P62421_en"   # Three words
+    - "P57548_en"   # Sum of two integer numbers
+    - "P41221_en"   # Sum of three integer numbers
+    - "P56118_en"   # Maximum of two integer numbers
+    - "P90615_en"   # Maximum of three integer numbers
+    - "P92351_en"   # Integer division and remainder of an integer number by a natural number
+    - "P98960_en"   # Uppercase and lowercase letters
+    - "P42042_en"   # Classification of characters (1)
+    - "P90226_en"   # Comparison of words
+    - "P92613_en"   # Rounding
+    - "P37469_en"   # Time decomposition (1)
+    - "P34279_en"   # Add one second
+    - "P81629_en"   # Minimum change
 
   advanced_problems:
-    - "P61634"   # Leap years
-    - "P51126"   # Intervals (1)
-    - "P56559"   # Intervals (2)
-    - "P89265"   # Intervals (3)
-    - "P58294"   # The answer
-    - "P42042"   # Classification of characters (1)
-    - "P37469"   # Time decomposition (1)
-    - "P34279"   # Add one second
-    - "P92351"   # Integer division and remainder of an integer number by a natural number
-    - "P98960"   # Uppercase and lowercase letters
+    - "P61634_en"   # Leap years
+    - "P51126_en"   # Intervals (1)
+    - "P56559_en"   # Intervals (2)
+    - "P89265_en"   # Intervals (3)
+    - "P58294_en"   # The answer
+    - "P42042_en"   # Classification of characters (1)
+    - "P37469_en"   # Time decomposition (1)
+    - "P34279_en"   # Add one second
+    - "P92351_en"   # Integer division and remainder of an integer number by a natural number
+    - "P98960_en"   # Uppercase and lowercase letters
 
 # Benchmark settings
 max_attempts_per_problem: 1
