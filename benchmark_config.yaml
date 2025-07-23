@@ -1,0 +1,80 @@
+# Jutge AI Model Benchmark Configuration
+models:
+  - name: "GPT-4o-mini"
+    provider: "openai"
+    model_id: "gpt-4o-mini"
+    api_key: null  # Will use OPENAI_API_KEY environment variable
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "GPT-4o"
+    provider: "openai"
+    model_id: "gpt-4o"
+    api_key: null  # Will use OPENAI_API_KEY environment variable
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "Claude-3.5-Sonnet"
+    provider: "anthropic"
+    model_id: "claude-3-5-sonnet-20241022"
+    api_key: null  # Will use ANTHROPIC_API_KEY environment variable
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: false  # Disabled by default, enable if API key is available
+
+  - name: "Gemini-Pro"
+    provider: "google"
+    model_id: "gemini-pro"
+    api_key: null  # Will use GOOGLE_API_KEY environment variable
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: false  # Disabled by default, enable if API key is available
+
+problem_sets:
+  hello_world:
+    - "P68688_en"  # Hello world!
+
+  basic_algorithms:
+    - "P68688_en"  # Hello world!
+    - "P34279_en"  # Add one second
+    - "P90615_en"  # Maximum of three integer numbers
+    - "P50327_en"  # Reversed number
+    - "P28754_en"  # Reversed number in binary
+
+  medium_problems:
+    - "P68688_en"  # Hello world!
+    - "P34279_en"  # Add one second  
+    - "P90615_en"  # Maximum of three integer numbers
+    - "P50327_en"  # Reversed number
+    - "P28754_en"  # Reversed number in binary
+    - "P13623_en"  # Chess board (1)
+    - "P72986_en"  # Polynomial evaluation (1)
+    - "P55622_en"  # Number of digits (1)
+    - "P33839_en"  # Sum of digits (1)
+    - "P29448_en"  # Correct dates
+
+  advanced_problems:
+    - "P29973_en"  # Triangle
+    - "P39225_en"  # I-th (1)
+    - "P59539_en"  # Harmonic numbers (1)
+    - "P58153_en"  # Harmonic numbers (2)
+    - "P31170_en"  # Multiplication table
+    - "P61634_en"  # Leap years
+    - "P37297_en"  # Control C102A
+    - "P34451_en"  # Control C101B
+    - "P82374_en"  # Control C102B
+    - "P42042_en"  # Classification of characters (1)
+
+# Benchmark settings
+max_attempts_per_problem: 1
+timeout_per_problem: 300  # 5 minutes
+retry_on_failure: true
+max_retries: 2
+save_detailed_logs: true
+output_format: "json"  # "json", "csv", "html" 

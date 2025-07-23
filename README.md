@@ -10,17 +10,25 @@ An automated system that reads programming problems from Jutge, generates soluti
 - 📊 **Batch Processing**: Solve multiple problems automatically
 - 🎯 **Smart Analysis**: Analyzes problems to suggest optimal approaches
 - 📈 **Progress Tracking**: Comprehensive logging and progress reports
+- 🏆 **Benchmarking**: Compare performance of different AI models
 
 ## Quick Start
 
 ### 1. Installation
 
 ```bash
-# Clone and install dependencies
+# Clone the repository
+git clone <repository-url>
+cd jutge-agent
+
+# Install uv if you haven't already
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies
 uv sync
 
-# Or using pip
-pip install -r requirements.txt
+# For benchmark features (optional)
+uv sync --extra benchmark
 ```
 
 ### 2. Configuration
@@ -97,6 +105,18 @@ P67890_ca
 Then run:
 ```bash
 uv run python cli.py solve --batch problems.txt
+```
+
+### AI Model Benchmarking
+```bash
+# Benchmark on basic problems
+uv run python cli.py benchmark basic_algorithms
+
+# Compare specific models
+uv run python cli.py benchmark --models GPT-4o-mini GPT-4o
+
+# Generate HTML report
+uv run python cli.py benchmark medium_problems --report html
 ```
 
 ### Test System

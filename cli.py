@@ -7,11 +7,17 @@ import argparse
 import os
 from datetime import datetime
 from typing import Optional
+import json
+import csv
 
 from rich.console import Console
 from rich.prompt import Prompt, Confirm
+from rich.table import Table
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from jutge_solver import JutgeProblemSolver, Config
+from jutge_solver.benchmark import AIModelBenchmark
+from jutge_solver.benchmark_config import BenchmarkConfig
 
 console = Console()
 
@@ -27,6 +33,9 @@ Examples:
   python cli.py solve P68688_en --compiler G++17   # Use C++ compiler
   python cli.py solve --batch problems.txt         # Solve multiple problems
   python cli.py config                             # Setup configuration
+  python cli.py benchmark hello_world              # Benchmark AI models on hello_world problem set
+  python cli.py benchmark basic_algorithms --models GPT-4o-mini GPT-4o  # Benchmark specific models
+  python cli.py benchmark --report html            # Generate HTML report
         """
     )
     
@@ -46,6 +55,14 @@ Examples:
     # Test command
     subparsers.add_parser('test', help='Test the system setup')
     
+    # Benchmark command
+    benchmark_parser = subparsers.add_parser('benchmark', help='Benchmark AI models on problem sets')
+    benchmark_parser.add_argument('problem_set', nargs='?', help='Problem set to benchmark (hello_world, basic_algorithms, medium_problems)')
+    benchmark_parser.add_argument('--models', '-m', nargs='+', help='Models to benchmark (GPT-4o-mini, GPT-4o, Claude-3.5-Sonnet)')
+    benchmark_parser.add_argument('--config', help='Benchmark config file path')
+    benchmark_parser.add_argument('--report', '-r', choices=['json', 'csv', 'html'], default='json', help='Report format')
+    benchmark_parser.add_argument('--parallel', '-p', action='store_true', help='Run models in parallel')
+    
     args = parser.parse_args()
     
     if args.command == 'solve':
@@ -54,6 +71,8 @@ Examples:
         handle_config_command(args)
     elif args.command == 'test':
         handle_test_command(args)
+    elif args.command == 'benchmark':
+        handle_benchmark_command(args)
     else:
         parser.print_help()
 
@@ -122,6 +141,193 @@ def handle_test_command(args):
         
     except Exception as e:
         console.print(f"[red]✗ System test failed: {e}[/red]")
+
+
+def handle_benchmark_command(args):
+    """Handle the benchmark command"""
+    console.print("[blue]🔬 Starting AI Model Benchmark[/blue]")
+    
+    # Load configuration
+    config = load_config(args.config)
+    if not config.validate():
+        console.print("[red]Configuration validation failed. Run 'python cli.py config' to setup.[/red]")
+        return
+    
+    # Load benchmark configuration
+    benchmark_config_path = args.config or "benchmark_config.yaml"
+    benchmark_config = BenchmarkConfig.load_from_file(benchmark_config_path)
+    
+    # Override models if specified in command line
+    if args.models:
+        # Filter to only requested models
+        benchmark_config.models = [m for m in benchmark_config.models if m.name in args.models]
+        if not benchmark_config.models:
+            console.print(f"[red]No valid models found from: {args.models}[/red]")
+            return
+    
+    # Validate benchmark config
+    if not benchmark_config.validate():
+        console.print("[red]Benchmark configuration validation failed[/red]")
+        return
+    
+    # Select problem set
+    if args.problem_set:
+        if args.problem_set not in benchmark_config.problem_sets:
+            console.print(f"[red]Unknown problem set: {args.problem_set}[/red]")
+            console.print(f"Available sets: {list(benchmark_config.problem_sets.keys())}")
+            return
+    else:
+        # Interactive selection
+        console.print("\nAvailable problem sets:")
+        for name, problems in benchmark_config.problem_sets.items():
+            console.print(f"  - {name}: {len(problems)} problems")
+        
+        args.problem_set = Prompt.ask(
+            "Select problem set",
+            choices=list(benchmark_config.problem_sets.keys()),
+            default="basic_algorithms"
+        )
+    
+    # Initialize benchmark
+    benchmark = AIModelBenchmark(benchmark_config, config)
+    
+    try:
+        # Run benchmark
+        console.print(f"\n[blue]Running benchmark on '{args.problem_set}' problem set[/blue]")
+        results = benchmark.run_benchmark(args.problem_set)
+        
+        # Display summary
+        display_benchmark_summary(results)
+        
+        # Generate report
+        if args.report == 'csv':
+            generate_csv_report(results)
+        elif args.report == 'html':
+            generate_html_report(results)
+        
+    except Exception as e:
+        console.print(f"[red]✗ Benchmark failed: {e}[/red]")
+        import traceback
+        traceback.print_exc()
+
+
+def display_benchmark_summary(results: dict):
+    """Display benchmark results summary in a nice table"""
+    console.print("\n[bold green]Benchmark Results Summary[/bold green]")
+    
+    # Create summary table
+    table = Table(title="Model Performance")
+    table.add_column("Model", style="cyan")
+    table.add_column("Problems", justify="right")
+    table.add_column("Solved", justify="right", style="green")
+    table.add_column("Failed", justify="right", style="red")
+    table.add_column("Success Rate", justify="right")
+    table.add_column("Avg Time", justify="right")
+    table.add_column("Total Tokens", justify="right")
+    
+    for model_name, stats in results['model_stats'].items():
+        success_rate = f"{stats['success_rate']:.1f}%"
+        avg_time = f"{stats['avg_time_per_problem']:.2f}s"
+        
+        table.add_row(
+            model_name,
+            str(stats['total_problems']),
+            str(stats['solved']),
+            str(stats['failed'] + stats['errors']),
+            success_rate,
+            avg_time,
+            str(stats['total_tokens'])
+        )
+    
+    console.print(table)
+    
+    console.print(f"\n[dim]Total benchmark time: {results['benchmark_time']:.2f} seconds[/dim]")
+
+
+def generate_csv_report(results: dict):
+    """Generate CSV report from benchmark results"""
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f"benchmark_report_{timestamp}.csv"
+    
+    with open(filename, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['Model', 'Problems', 'Solved', 'Failed', 'Success Rate', 'Avg Time', 'Total Tokens'])
+        
+        for model_name, stats in results['model_stats'].items():
+            writer.writerow([
+                model_name,
+                stats['total_problems'],
+                stats['solved'],
+                stats['failed'] + stats['errors'],
+                f"{stats['success_rate']:.1f}",
+                f"{stats['avg_time_per_problem']:.2f}",
+                stats['total_tokens']
+            ])
+    
+    console.print(f"[green]✓ CSV report saved to {filename}[/green]")
+
+
+def generate_html_report(results: dict):
+    """Generate HTML report from benchmark results"""
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f"benchmark_report_{timestamp}.html"
+    
+    html_content = f"""
+    <html>
+    <head>
+        <title>Jutge AI Benchmark Report</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 40px; }}
+            h1 {{ color: #333; }}
+            table {{ border-collapse: collapse; width: 100%; }}
+            th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+            th {{ background-color: #4CAF50; color: white; }}
+            tr:nth-child(even) {{ background-color: #f2f2f2; }}
+            .success {{ color: green; font-weight: bold; }}
+            .failed {{ color: red; font-weight: bold; }}
+        </style>
+    </head>
+    <body>
+        <h1>Jutge AI Model Benchmark Report</h1>
+        <p>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+        <p>Total benchmark time: {results['benchmark_time']:.2f} seconds</p>
+        
+        <table>
+            <tr>
+                <th>Model</th>
+                <th>Problems</th>
+                <th>Solved</th>
+                <th>Failed</th>
+                <th>Success Rate</th>
+                <th>Avg Time</th>
+                <th>Total Tokens</th>
+            </tr>
+    """
+    
+    for model_name, stats in results['model_stats'].items():
+        success_class = 'success' if stats['success_rate'] >= 80 else 'failed' if stats['success_rate'] < 50 else ''
+        html_content += f"""
+            <tr>
+                <td>{model_name}</td>
+                <td>{stats['total_problems']}</td>
+                <td class="success">{stats['solved']}</td>
+                <td class="failed">{stats['failed'] + stats['errors']}</td>
+                <td class="{success_class}">{stats['success_rate']:.1f}%</td>
+                <td>{stats['avg_time_per_problem']:.2f}s</td>
+                <td>{stats['total_tokens']}</td>
+            </tr>
+        """
+    
+    html_content += """
+        </table>
+    </body>
+    </html>
+    """
+    
+    with open(filename, 'w') as f:
+        f.write(html_content)
+    
+    console.print(f"[green]✓ HTML report saved to {filename}[/green]")
 
 
 def solve_single(solver: JutgeProblemSolver, problem_id: str, compiler_id: Optional[str]):
