@@ -18,7 +18,7 @@ An automated system that reads programming problems from Jutge, generates soluti
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/Huguet57/jutge-agent/
 cd jutge-agent
 
 # Install uv if you haven't already
@@ -44,7 +44,7 @@ uv run python cli.py config --interactive
 cp .env.example .env
 
 # Edit .env with your credentials
-nano .env
+vi .env
 ```
 
 Add your credentials to `.env`:
@@ -71,7 +71,7 @@ uv run python cli.py config
 ### 4. Test the Setup
 
 ```bash
-uv run python test_system.py
+uv run python tests/test_system.py
 ```
 
 ### 5. Solve Your First Problem
