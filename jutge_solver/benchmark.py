@@ -5,11 +5,11 @@ AI Model Benchmarking System for Jutge Problems
 import os
 import json
 import time
-import asyncio
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 import logging
+import multiprocessing as mp
 
 from openai import OpenAI
 
@@ -29,8 +29,7 @@ except ImportError:
     genai = None
 
 from jutge_api_client import JutgeApiClient
-from jutge_solver import JutgeProblemSolver, Config
-from jutge_solver.solution_generator import SolutionGenerator
+from jutge_solver import Config
 from jutge_solver.benchmark_config import BenchmarkConfig, AIModelConfig
 from jutge_solver.problem_analyzer import ProblemAnalyzer
 
@@ -50,6 +49,7 @@ class BenchmarkResult:
         self.error = None
         self.solution_code = None
         self.language = None
+        self.submission_details = None  # For storing compiler output, test case results, etc.
         
     def to_dict(self) -> Dict[str, Any]:
         """Convert result to dictionary"""
@@ -66,7 +66,9 @@ class BenchmarkResult:
             "error": self.error,
             "language": self.language,
             "success": self.verdict == "AC",
-            "timestamp": datetime.utcnow().isoformat()
+            "solution_code": self.solution_code,  # Add the generated code for debugging
+            "submission_details": self.submission_details,  # Compiler output, test results, etc.
+            "timestamp": datetime.now().isoformat()
         }
 
 
@@ -176,10 +178,150 @@ Generate only the code solution without any explanation or markdown formatting.
         return "\n".join(formatted)
 
 
+def benchmark_single_problem(model_config: AIModelConfig, problem_id: str, jutge_config: Config, 
+                            max_attempts: int, logger_name: str) -> BenchmarkResult:
+    """Benchmark a single problem with a single model - designed for parallel execution"""
+    # Create fresh instances for this worker
+    jutge_client = JutgeApiClient()
+    jutge_client.login(jutge_config.jutge.email, jutge_config.jutge.password)
+    problem_analyzer = ProblemAnalyzer(jutge_client)
+    adapter = AIModelAdapter(model_config)
+    
+    # Setup logger for this worker
+    logger = logging.getLogger(logger_name)
+    
+    result = BenchmarkResult(model_config.name, problem_id)
+    
+    try:
+        # Get problem data
+        problem_info = problem_analyzer.analyze_problem(problem_id)
+        if not problem_info or not problem_info.get("success"):
+            raise Exception(f"Failed to fetch problem {problem_id}")
+        
+        problem_data = problem_info
+        
+        # Attempt to solve
+        for attempt in range(max_attempts):
+            result.attempts = attempt + 1
+            
+            try:
+                # Generate solution
+                solution, tokens, gen_time = adapter.generate_solution(problem_data, "Python3")
+                result.solution_code = solution
+                result.tokens_used = tokens
+                result.generation_time = gen_time
+                result.language = "Python3"
+                
+                # Submit solution with retry logic for server errors
+                submission_start = time.time()
+                submission_retries = 0
+                max_submission_retries = 3
+                
+                while submission_retries < max_submission_retries:
+                    try:
+                        submission_id = jutge_client.student.submissions.submit(
+                            problem_id, 
+                            "Python3",
+                            solution,
+                            f"Benchmark test by {model_config.name}"
+                        )
+                        result.submission_time = time.time() - submission_start
+                        result.submission_id = submission_id
+                        break  # Success, exit retry loop
+                        
+                    except Exception as submit_error:
+                        submission_retries += 1
+                        error_str = str(submit_error)
+                        
+                        # Check if it's a server error that might be worth retrying
+                        if "UNREPORTED_ERROR" in error_str or "An error occurred" in error_str:
+                            logger.warning(f"Jutge server error on attempt {submission_retries}: {error_str}")
+                            if submission_retries < max_submission_retries:
+                                time.sleep(2)  # Wait before retry
+                                continue
+                            else:
+                                logger.error(f"Max retries reached for {problem_id}: {error_str}")
+                        
+                        # For other errors or max retries reached, record and raise
+                        result.error = f"Submission failed: {error_str}"
+                        result.submission_details = {"error_type": "submission_error", "details": error_str}
+                        raise submit_error
+                
+                # Wait for verdict
+                verdict = _wait_for_verdict_standalone(jutge_client, problem_id, submission_id, logger)
+                result.verdict = verdict
+                
+                # Try to get additional submission details
+                try:
+                    state = jutge_client.student.submissions.get(problem_id, submission_id)
+                    if hasattr(state, '__dict__'):
+                        details = {}
+                        for attr in ['compiler_output', 'execution_time', 'memory_usage', 'test_results']:
+                            if hasattr(state, attr):
+                                details[attr] = getattr(state, attr)
+                        if details:
+                            result.submission_details = details
+                except Exception as e:
+                    logger.debug(f"Could not fetch submission details: {e}")
+                
+                if verdict == "AC":
+                    break
+                    
+            except Exception as e:
+                logger.error(f"Problem {problem_id} attempt {attempt + 1} failed: {e}")
+                if attempt == max_attempts - 1:
+                    result.error = str(e)
+        
+        result.total_time = result.generation_time + result.submission_time
+        logger.info(f"Problem {problem_id} result: {result.verdict} ({result.attempts} attempts, {result.total_time:.2f}s)")
+        
+    except Exception as e:
+        logger.error(f"Failed to benchmark problem {problem_id}: {e}")
+        result.error = str(e)
+        result.verdict = "ERROR"
+    
+    return result
+
+
+def _wait_for_verdict_standalone(jutge_client: JutgeApiClient, problem_id: str, 
+                                submission_id: str, logger: logging.Logger, timeout: int = 60) -> str:
+    """Wait for submission verdict - standalone version for parallel execution"""
+    start_time = time.time()
+    
+    while time.time() - start_time < timeout:
+        try:
+            state = jutge_client.student.submissions.get(problem_id, submission_id)
+            
+            # Check if submission is done
+            if hasattr(state, 'state') and state.state == "done":
+                # Try different possible verdict attribute names
+                if hasattr(state, 'veredict'):
+                    return state.veredict
+                elif hasattr(state, 'verdict'):
+                    return state.verdict
+                else:
+                    logger.warning(f"Submission done but no verdict found in state object")
+                    return "NO_VERDICT"
+            
+            # Log current state for debugging
+            current_state = getattr(state, 'state', 'unknown')
+            logger.debug(f"Submission {submission_id} state: {current_state}")
+                
+        except Exception as e:
+            logger.error(f"Error checking submission status: {e}")
+            # Don't give up immediately on errors
+            
+        time.sleep(2)
+    
+    logger.warning(f"Verdict polling timeout for submission {submission_id}")
+    return "TIMEOUT"
+
+
 class AIModelBenchmark:
     """Main benchmark orchestrator"""
     
-    def __init__(self, benchmark_config: BenchmarkConfig, jutge_config: Config):
+    def __init__(self, benchmark_config: BenchmarkConfig, jutge_config: Config, 
+                 max_workers: Optional[int] = None, use_processes: bool = True):
         self.benchmark_config = benchmark_config
         self.jutge_config = jutge_config
         self.jutge_client = JutgeApiClient()
@@ -187,6 +329,10 @@ class AIModelBenchmark:
         self.problem_analyzer = ProblemAnalyzer(self.jutge_client)
         self.results: List[BenchmarkResult] = []
         self.logger = self._setup_logger()
+        
+        # Parallelization settings
+        self.max_workers = max_workers or min(mp.cpu_count(), 8)  # Cap at 8 to avoid overwhelming the API
+        self.use_processes = use_processes
         
     def _setup_logger(self) -> logging.Logger:
         """Setup benchmark logger"""
@@ -220,10 +366,16 @@ class AIModelBenchmark:
         
         # Jutge authentication already done in __init__
         
-        # Run benchmarks
-        for model_config in models:
-            self.logger.info(f"Benchmarking model: {model_config.name}")
-            self._benchmark_model(model_config, problem_ids)
+        # Run benchmarks in parallel
+        self.logger.info(f"Running benchmarks with {self.max_workers} workers using {'processes' if self.use_processes else 'threads'}")
+        if self.benchmark_config.parallel_strategy == "full":
+            self._benchmark_models_parallel(models, problem_ids)
+        elif self.benchmark_config.parallel_strategy == "models":
+            self._benchmark_models_sequential_problems_parallel(models, problem_ids)
+        else:  # sequential fallback
+            for model_config in models:
+                self.logger.info(f"Benchmarking model: {model_config.name}")
+                self._benchmark_model(model_config, problem_ids)
         
         total_time = time.time() - start_time
         
@@ -234,6 +386,87 @@ class AIModelBenchmark:
         self._save_results(problem_set_name)
         
         return summary
+    
+    def _benchmark_models_parallel(self, models: List[AIModelConfig], problem_ids: List[str]) -> None:
+        """Benchmark all models on all problems in parallel"""
+        # Create all (model, problem) pairs
+        tasks = []
+        for model_config in models:
+            for problem_id in problem_ids:
+                tasks.append((model_config, problem_id))
+        
+        self.logger.info(f"Created {len(tasks)} benchmark tasks")
+        
+        # Choose executor based on configuration
+        executor_class = ProcessPoolExecutor if self.use_processes else ThreadPoolExecutor
+        
+        with executor_class(max_workers=self.max_workers) as executor:
+            # Submit all tasks
+            future_to_task = {}
+            for model_config, problem_id in tasks:
+                future = executor.submit(
+                    benchmark_single_problem,
+                    model_config,
+                    problem_id,
+                    self.jutge_config,
+                    self.benchmark_config.max_attempts_per_problem,
+                    f"benchmark.{model_config.name}"
+                )
+                future_to_task[future] = (model_config.name, problem_id)
+            
+            # Collect results as they complete
+            for future in as_completed(future_to_task):
+                model_name, problem_id = future_to_task[future]
+                try:
+                    result = future.result()
+                    self.results.append(result)
+                    self.logger.info(f"Completed {model_name} on {problem_id}: {result.verdict}")
+                except Exception as e:
+                    self.logger.error(f"Task {model_name}/{problem_id} failed: {e}")
+                    # Create error result
+                    error_result = BenchmarkResult(model_name, problem_id)
+                    error_result.error = str(e)
+                    error_result.verdict = "ERROR"
+                    self.results.append(error_result)
+    
+    def _benchmark_models_sequential_problems_parallel(self, models: List[AIModelConfig], problem_ids: List[str]) -> None:
+        """Benchmark models sequentially, but problems within each model in parallel"""
+        for model_config in models:
+            self.logger.info(f"Benchmarking model: {model_config.name}")
+            self._benchmark_model_parallel(model_config, problem_ids)
+    
+    def _benchmark_model_parallel(self, model_config: AIModelConfig, problem_ids: List[str]) -> None:
+        """Benchmark a single model on all problems in parallel"""
+        executor_class = ProcessPoolExecutor if self.use_processes else ThreadPoolExecutor
+        
+        with executor_class(max_workers=self.max_workers) as executor:
+            # Submit all problems for this model
+            future_to_problem = {}
+            for problem_id in problem_ids:
+                future = executor.submit(
+                    benchmark_single_problem,
+                    model_config,
+                    problem_id,
+                    self.jutge_config,
+                    self.benchmark_config.max_attempts_per_problem,
+                    f"benchmark.{model_config.name}"
+                )
+                future_to_problem[future] = problem_id
+            
+            # Collect results as they complete
+            for future in as_completed(future_to_problem):
+                problem_id = future_to_problem[future]
+                try:
+                    result = future.result()
+                    self.results.append(result)
+                    self.logger.info(f"  Problem {problem_id}: {result.verdict} ({result.attempts} attempts, {result.total_time:.2f}s)")
+                except Exception as e:
+                    self.logger.error(f"  Problem {problem_id} failed: {e}")
+                    # Create error result
+                    error_result = BenchmarkResult(model_config.name, problem_id)
+                    error_result.error = str(e)
+                    error_result.verdict = "ERROR"
+                    self.results.append(error_result)
     
     def _benchmark_model(self, model_config: AIModelConfig, problem_ids: List[str]) -> None:
         """Benchmark a single model on all problems"""
@@ -252,7 +485,6 @@ class AIModelBenchmark:
                 problem_data = problem_info  # Use the analyzed problem info
                 
                 # Attempt to solve
-                solved = False
                 for attempt in range(self.benchmark_config.max_attempts_per_problem):
                     result.attempts = attempt + 1
                     
@@ -280,7 +512,6 @@ class AIModelBenchmark:
                         result.verdict = verdict
                         
                         if verdict == "AC":
-                            solved = True
                             break
                             
                     except Exception as e:
@@ -348,7 +579,7 @@ class AIModelBenchmark:
             stats["verdicts"][result.verdict] = stats["verdicts"].get(result.verdict, 0) + 1
         
         # Calculate success rates
-        for model_name, stats in model_stats.items():
+        for stats in model_stats.values():
             stats["success_rate"] = (stats["solved"] / stats["total_problems"]) * 100 if stats["total_problems"] > 0 else 0
             stats["avg_time_per_problem"] = stats["total_time"] / stats["total_problems"] if stats["total_problems"] > 0 else 0
         
@@ -357,7 +588,7 @@ class AIModelBenchmark:
             "total_problems": len(set(r.problem_id for r in self.results)),
             "total_models": len(model_stats),
             "model_stats": model_stats,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now().isoformat()
         }
     
     def _save_results(self, problem_set_name: str) -> None:

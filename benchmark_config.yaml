@@ -85,4 +85,5 @@ timeout_per_problem: 300  # 5 minutes
 retry_on_failure: true
 max_retries: 2
 save_detailed_logs: true
-output_format: "json"  # "json", "csv", "html" 
+output_format: "json"  # "json", "csv", "html"
+parallel_strategy: "full"  # "full", "models", "sequential" 

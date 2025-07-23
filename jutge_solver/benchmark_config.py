@@ -31,6 +31,7 @@ class BenchmarkConfig(BaseModel):
     max_retries: int = 2
     save_detailed_logs: bool = True
     output_format: str = "json"  # "json", "csv", "html"
+    parallel_strategy: str = "full"  # "full", "models", "sequential"
     
     @classmethod
     def create_default(cls) -> "BenchmarkConfig":

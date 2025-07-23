@@ -1387,15 +1387,27 @@ def _debuild(x: Any) -> Any:
 def _raise_exception(error: dict[str, Any], operation_id: str | None) -> None:
     # TODO: do something with operation_id
     message = error.get("message", "Unknown error")
-    if error["name"] == "UnauthorizedError":
+    error_name = error.get("name", "UnknownError")
+    
+    if error_name == "UnauthorizedError":
         raise UnauthorizedException(message)
-    if error["name"] == "InfoError":
+    if error_name == "InfoError":
         raise InfoException(message)
-    if error["name"] == "NotFoundError":
+    if error_name == "NotFoundError":
         raise NotFoundException(message)
-    if error["name"] == "InputError":
+    if error_name == "InputError":
         raise InputException(message)
-    raise Exception("Unknown error")
+    
+    # For unknown errors, include more details
+    error_details = f"{error_name}: {message}"
+    if operation_id:
+        error_details += f" (operation: {operation_id})"
+    
+    # Include the full error dict for debugging
+    import json
+    error_details += f" [Full error: {json.dumps(error)}]"
+    
+    raise Exception(error_details)
 
 
 class Util:

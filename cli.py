@@ -188,8 +188,15 @@ def handle_benchmark_command(args):
             default="basic_algorithms"
         )
     
-    # Initialize benchmark
-    benchmark = AIModelBenchmark(benchmark_config, config)
+    # Initialize benchmark with parallel support
+    max_workers = 4 if args.parallel else 1
+    use_processes = args.parallel
+    benchmark = AIModelBenchmark(
+        benchmark_config, 
+        config,
+        max_workers=max_workers,
+        use_processes=use_processes
+    )
     
     try:
         # Run benchmark
