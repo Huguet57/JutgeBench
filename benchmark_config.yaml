@@ -38,38 +38,46 @@ models:
 
 problem_sets:
   hello_world:
-    - "P68688_en"  # Hello world!
+    - "P68688"  # Hello world!
 
   basic_algorithms:
-    - "P68688_en"  # Hello world!
-    - "P34279_en"  # Add one second
-    - "P90615_en"  # Maximum of three integer numbers
-    - "P50327_en"  # Reversed number
-    - "P28754_en"  # Reversed number in binary
+    - "P68688"   # Hello world!
+    - "P62421"   # Three words
+    - "P57548"   # Sum of two integer numbers
+    - "P41221"   # Sum of three integer numbers
+    - "P56118"   # Maximum of two integer numbers
+    - "P52847"   # Maximum of three different integer numbers
+    - "P90615"   # Maximum of three integer numbers
+    - "P15613"   # Temperatures
+    - "P48107"   # Integer division and remainder of two natural numbers
 
   medium_problems:
-    - "P68688_en"  # Hello world!
-    - "P34279_en"  # Add one second  
-    - "P90615_en"  # Maximum of three integer numbers
-    - "P50327_en"  # Reversed number
-    - "P28754_en"  # Reversed number in binary
-    - "P13623_en"  # Chess board (1)
-    - "P72986_en"  # Polynomial evaluation (1)
-    - "P55622_en"  # Number of digits (1)
-    - "P33839_en"  # Sum of digits (1)
-    - "P29448_en"  # Correct dates
+    - "P68688"   # Hello world!
+    - "P62421"   # Three words
+    - "P57548"   # Sum of two integer numbers
+    - "P41221"   # Sum of three integer numbers
+    - "P56118"   # Maximum of two integer numbers
+    - "P90615"   # Maximum of three integer numbers
+    - "P92351"   # Integer division and remainder of an integer number by a natural number
+    - "P98960"   # Uppercase and lowercase letters
+    - "P42042"   # Classification of characters (1)
+    - "P90226"   # Comparison of words
+    - "P92613"   # Rounding
+    - "P37469"   # Time decomposition (1)
+    - "P34279"   # Add one second
+    - "P81629"   # Minimum change
 
   advanced_problems:
-    - "P29973_en"  # Triangle
-    - "P39225_en"  # I-th (1)
-    - "P59539_en"  # Harmonic numbers (1)
-    - "P58153_en"  # Harmonic numbers (2)
-    - "P31170_en"  # Multiplication table
-    - "P61634_en"  # Leap years
-    - "P37297_en"  # Control C102A
-    - "P34451_en"  # Control C101B
-    - "P82374_en"  # Control C102B
-    - "P42042_en"  # Classification of characters (1)
+    - "P61634"   # Leap years
+    - "P51126"   # Intervals (1)
+    - "P56559"   # Intervals (2)
+    - "P89265"   # Intervals (3)
+    - "P58294"   # The answer
+    - "P42042"   # Classification of characters (1)
+    - "P37469"   # Time decomposition (1)
+    - "P34279"   # Add one second
+    - "P92351"   # Integer division and remainder of an integer number by a natural number
+    - "P98960"   # Uppercase and lowercase letters
 
 # Benchmark settings
 max_attempts_per_problem: 1

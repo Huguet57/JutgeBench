@@ -167,3 +167,6 @@ Desktop.ini
 
 # uv
 .uv_cache/
+
+# Benchmark results
+results/

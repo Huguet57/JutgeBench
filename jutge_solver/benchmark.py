@@ -190,8 +190,12 @@ class AIModelBenchmark:
         
     def _setup_logger(self) -> logging.Logger:
         """Setup benchmark logger"""
+        # Create results directory if it doesn't exist
+        os.makedirs("results", exist_ok=True)
+        
         logger = logging.getLogger("benchmark")
-        handler = logging.FileHandler(f"benchmark_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+        log_filename = os.path.join("results", f"benchmark_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+        handler = logging.FileHandler(log_filename)
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
@@ -358,8 +362,11 @@ class AIModelBenchmark:
     
     def _save_results(self, problem_set_name: str) -> None:
         """Save benchmark results to file"""
+        # Ensure results directory exists
+        os.makedirs("results", exist_ok=True)
+        
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"benchmark_results_{problem_set_name}_{timestamp}.json"
+        filename = os.path.join("results", f"benchmark_results_{problem_set_name}_{timestamp}.json")
         
         data = {
             "problem_set": problem_set_name,
