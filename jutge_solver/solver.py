@@ -39,7 +39,10 @@ class JutgeProblemSolver:
         
         # Initialize components
         self.jutge_client = JutgeApiClient()
-        self.openai_client = openai.OpenAI(api_key=self.config.openai.api_key)
+        self.openai_client = openai.OpenAI(
+            api_key=self.config.openai.api_key,
+            base_url=self.config.openai.base_url,
+        )
         self.problem_analyzer = ProblemAnalyzer(self.jutge_client)
         self.solution_generator = SolutionGenerator(self.openai_client, self.config.openai)
         self.verdict_manager = VerdictManager(self.jutge_client, self.config.jutge)

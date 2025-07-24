@@ -115,7 +115,7 @@ The project is organized as a comprehensive AI-powered problem solving system:
 - **Testing**: `pytest` with coverage reporting and async support
 
 **Authentication and security:**
-- Environment variables for credentials (`JUTGE_EMAIL`, `JUTGE_PASSWORD`, `OPENAI_API_KEY`)
+- Environment variables for credentials (`JUTGE_EMAIL`, `JUTGE_PASSWORD`, `OPENROUTER_API_KEY`)
 - Interactive credential prompts with `rich.Prompt`
 - Secure credential storage and validation
 - API key management for multiple AI providers

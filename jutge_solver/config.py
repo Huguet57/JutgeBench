@@ -18,6 +18,7 @@ class OpenAIConfig(BaseModel):
     max_tokens: int = 2000
     temperature: float = 0.1
     timeout: int = 30
+    base_url: Optional[str] = None
 
 
 class JutgeConfig(BaseModel):
@@ -51,6 +52,9 @@ class Config(BaseModel):
         # Load from environment variables
         if api_key := os.getenv("OPENAI_API_KEY"):
             config.openai.api_key = api_key
+        elif api_key := os.getenv("OPENROUTER_API_KEY"):
+            config.openai.api_key = api_key
+            config.openai.base_url = "https://openrouter.ai/api/v1"
         if model := os.getenv("OPENAI_MODEL"):
             config.openai.model = model
         if email := os.getenv("JUTGE_EMAIL"):

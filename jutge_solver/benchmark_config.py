@@ -12,13 +12,14 @@ from datetime import datetime
 class AIModelConfig(BaseModel):
     """Configuration for a single AI model"""
     name: str
-    provider: str  # "openai", "anthropic", "google", etc.
+    provider: str  # "openai", "anthropic", "google", "openrouter", etc.
     model_id: str
     api_key: Optional[str] = None
     max_tokens: int = 2000
     temperature: float = 0.1
     timeout: int = 30
     enabled: bool = True
+    base_url: Optional[str] = None
 
 
 class BenchmarkConfig(BaseModel):
@@ -39,26 +40,29 @@ class BenchmarkConfig(BaseModel):
         default_models = [
             AIModelConfig(
                 name="GPT-4o-mini",
-                provider="openai",
-                model_id="gpt-4o-mini",
-                api_key=os.getenv("OPENAI_API_KEY"),
-                temperature=0.1
+                provider="openrouter",
+                model_id="openai/gpt-4o-mini",
+                api_key=os.getenv("OPENROUTER_API_KEY"),
+                temperature=0.1,
+                base_url="https://openrouter.ai/api/v1",
             ),
             AIModelConfig(
                 name="GPT-4o",
-                provider="openai", 
-                model_id="gpt-4o",
-                api_key=os.getenv("OPENAI_API_KEY"),
-                temperature=0.1
+                provider="openrouter",
+                model_id="openai/gpt-4o",
+                api_key=os.getenv("OPENROUTER_API_KEY"),
+                temperature=0.1,
+                base_url="https://openrouter.ai/api/v1",
             ),
             # Placeholder for other models - can be extended
             AIModelConfig(
                 name="Claude-3.5-Sonnet",
-                provider="anthropic",
-                model_id="claude-3-5-sonnet-20241022",
-                api_key=os.getenv("ANTHROPIC_API_KEY"),
+                provider="openrouter",
+                model_id="anthropic/claude-3-5-sonnet-20241022",
+                api_key=os.getenv("OPENROUTER_API_KEY"),
                 temperature=0.1,
-                enabled=False  # Disabled by default until API key is provided
+                enabled=False,
+                base_url="https://openrouter.ai/api/v1",
             ),
         ]
         
@@ -100,6 +104,10 @@ class BenchmarkConfig(BaseModel):
                         model.api_key = os.getenv("ANTHROPIC_API_KEY")
                     elif model.provider == "google":
                         model.api_key = os.getenv("GOOGLE_API_KEY")
+                    elif model.provider == "openrouter":
+                        model.api_key = os.getenv("OPENROUTER_API_KEY")
+                        if model.base_url is None:
+                            model.base_url = "https://openrouter.ai/api/v1"
             
             return config
         except FileNotFoundError:
