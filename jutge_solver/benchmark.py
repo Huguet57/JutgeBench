@@ -235,14 +235,16 @@ def benchmark_single_problem(model_config: AIModelConfig, problem_id: str, jutge
                         submission_retries += 1
                         error_str = str(submit_error)
                         
-                        # Check if it's a server error that might be worth retrying
+                        # Check if it's a rate limit error (UNREPORTED_ERROR) that needs longer wait
                         if "UNREPORTED_ERROR" in error_str or "An error occurred" in error_str:
-                            logger.warning(f"Jutge server error on attempt {submission_retries}: {error_str}")
+                            wait_time = min(5 * submission_retries, 30)  # Exponential backoff: 5s, 10s, 15s (max 30s)
+                            logger.warning(f"Jutge rate limit detected on attempt {submission_retries}: {error_str}")
                             if submission_retries < max_submission_retries:
-                                time.sleep(2)  # Wait before retry
+                                logger.info(f"Waiting {wait_time}s before retry due to rate limiting...")
+                                time.sleep(wait_time)
                                 continue
                             else:
-                                logger.error(f"Max retries reached for {problem_id}: {error_str}")
+                                logger.error(f"Max retries reached for {problem_id} after rate limiting: {error_str}")
                         
                         # For other errors or max retries reached, record and raise
                         result.error = f"Submission failed: {error_str}"
