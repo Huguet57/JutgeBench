@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Python project that provides examples for using the `jutge_api_client` library to interact with the Jutge online judge platform. The project focuses on demonstrating various API operations like problem retrieval, user authentication, submissions, and profile management.
+This is an AI-powered system that automatically solves programming problems from the Jutge online judge platform. The project combines API interaction with OpenAI GPT models to read problems, generate solutions, submit them, and analyze results. It includes a comprehensive CLI interface, benchmarking system, and batch processing capabilities for automated problem solving.
 
 ## Essential Commands
 
@@ -13,7 +13,13 @@ This is a Python project that provides examples for using the `jutge_api_client`
 # Install dependencies
 uv sync
 
-# Activate virtual environment
+# Install with benchmark dependencies (for AI model comparison)
+uv sync --extra benchmark
+
+# Install development dependencies
+uv sync --extra dev
+
+# Activate virtual environment (if needed)
 source .venv/bin/activate
 ```
 
@@ -35,6 +41,24 @@ uv run pytest --ignore=examples
 uv run pytest --cov --ignore=examples
 ```
 
+**CLI Usage:**
+```bash
+# Interactive configuration setup
+uv run python cli.py config --interactive
+
+# Solve a specific problem
+uv run python cli.py solve P12345
+
+# Solve multiple problems from a list
+uv run python cli.py solve P12345 P67890 P11111
+
+# Run benchmarks comparing different AI models
+uv run python cli.py benchmark --config benchmark_config.yaml
+
+# View benchmark results
+uv run python view_benchmark_results.py
+```
+
 **Pre-commit hooks:**
 ```bash
 # Install hooks
@@ -46,32 +70,54 @@ uv run pre-commit run --all-files
 
 ## Architecture and Structure
 
-The project is organized as a collection of example scripts that demonstrate different aspects of the Jutge API:
+The project is organized as a comprehensive AI-powered problem solving system:
 
-- **examples/**: Contains standalone Python scripts showcasing API usage (excluded from linting/testing as they are official examples)
-  - `get_server_time.py`: Basic API connectivity test
-  - `submit_problem.py`: Full submission workflow with authentication
-  - `read_problem.py`: Problem retrieval and content access
-  - `show_user_profile.py`: User authentication and profile access
-  - `list_available_compilers.py`: Compiler enumeration
-  - `print_problems_status.py`: Problem status checking
+**Core modules (jutge_solver/):**
+- `solver.py`: Main problem solving orchestration
+- `problem_analyzer.py`: AI-powered problem analysis and approach detection
+- `solution_generator.py`: Code generation using OpenAI models
+- `verdict_manager.py`: Submission tracking and result analysis
+- `benchmark.py`: Performance comparison across different AI models
+- `config.py`: Configuration management and validation
 
-**Key API patterns:**
-- All examples use `JutgeApiClient()` as the main entry point
-- Authentication is handled via `jutge.login(email, password)`
-- API calls follow the pattern `jutge.{service}.{operation}()`
-- Main services: `misc`, `problems`, `student.profile`, `student.submissions`
+**Entry points:**
+- `cli.py`: Main CLI interface for interactive usage
+- `main.py`: Alternative entry point for programmatic usage
+- `view_benchmark_results.py`: Benchmark results visualization
 
-**Environment setup:**
-- Uses `uv` for dependency management instead of pip
-- Follows modern Python tooling with ruff for linting/formatting
-- Type checking with mypy
-- Testing with pytest
-- Pre-commit hooks for code quality
+**API layer:**
+- `jutge_api_client.py`: Direct API client for Jutge platform interaction
 
-**Authentication:**
-Examples demonstrate two authentication patterns:
-1. Environment variables (`JUTGE_EMAIL`, `JUTGE_PASSWORD`) 
-2. Interactive prompts using `rich.Prompt`
+**Configuration files:**
+- `config.yaml`: Main system configuration
+- `benchmark_config.yaml`: Benchmark-specific settings
+- `pyproject.toml`: Project dependencies and build configuration
 
-When working with this codebase, focus on the API usage patterns in the examples and maintain consistency with the established authentication and error handling approaches.
+**Examples and reference:**
+- `examples/`: Standalone scripts demonstrating API usage patterns
+- `tests/`: Comprehensive test suite with unit and integration tests
+- `results/`: Benchmark results and execution logs
+
+**Key architectural patterns:**
+- **Modular design**: Separate concerns for analysis, generation, and execution
+- **Configuration-driven**: YAML-based configuration for flexibility
+- **AI integration**: OpenAI API for intelligent problem solving
+- **Async processing**: Support for batch operations and concurrent submissions
+- **Comprehensive logging**: Detailed execution tracking and debugging
+- **Error resilience**: Robust error handling and retry mechanisms
+
+**Technology stack:**
+- **Package management**: `uv` for fast, reliable dependency management
+- **AI models**: OpenAI GPT-4, GPT-3.5-turbo with model comparison capabilities
+- **HTTP client**: `requests` with `requests-toolbelt` for file uploads
+- **Configuration**: `pyyaml` and `pydantic` for robust config management
+- **CLI**: `rich` for beautiful terminal interfaces
+- **Testing**: `pytest` with coverage reporting and async support
+
+**Authentication and security:**
+- Environment variables for credentials (`JUTGE_EMAIL`, `JUTGE_PASSWORD`, `OPENAI_API_KEY`)
+- Interactive credential prompts with `rich.Prompt`
+- Secure credential storage and validation
+- API key management for multiple AI providers
+
+When working with this codebase, focus on the modular architecture, maintain consistency with the AI-driven workflow, and ensure proper error handling throughout the problem-solving pipeline.
