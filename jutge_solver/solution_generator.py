@@ -136,9 +136,10 @@ class SolutionGenerator:
 
 IMPORTANT REQUIREMENTS:
 - Write ONLY the solution code, no explanations or comments
+- DO NOT use markdown code blocks (```python, ```cpp, ```java, etc.)
+- Output the raw code directly without any formatting or backticks
 - Ensure the code handles all input/output exactly as specified
 - Use efficient algorithms appropriate for competitive programming
-- Test your logic mentally before providing the solution
 - Make sure to handle edge cases and constraints"""
 
         if compiler_id == "Python3":
@@ -149,17 +150,15 @@ PYTHON SPECIFIC:
 - Read input using input() function
 - Print output using print() function
 - Be careful with integer division (use // for floor division)
-- Consider using sys.stdin for faster input if needed"""
-
+"""
         elif compiler_id in ["G++17", "G++"]:
             return base_prompt + """
 
 C++ SPECIFIC:
 - Use standard competitive programming includes: #include <iostream> and others as needed
-- Use 'using namespace std;' for convenience
 - Include proper main() function
-- Use cin/cout for input/output
-- Be careful with data types (int vs long long)"""
+- Use std::'s cin/cout for input/output
+"""
 
         elif compiler_id == "JDK":
             return base_prompt + """
@@ -185,6 +184,8 @@ JAVA SPECIFIC:
 
 Requirements:
 - Provide only the complete, runnable code
+- DO NOT wrap the code in markdown blocks (```python, ```cpp, ```java, etc.)
+- Output the raw code directly without backticks or formatting
 - No explanations, comments, or markdown formatting
 - Handle input/output exactly as specified in the problem
 - Ensure the solution is efficient and handles edge cases
