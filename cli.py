@@ -29,13 +29,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python cli.py solve P68688_en                    # Solve Hello World problem
-  python cli.py solve P68688_en --compiler G++17   # Use C++ compiler
-  python cli.py solve --batch problems.txt         # Solve multiple problems
-  python cli.py config                             # Setup configuration
-  python cli.py benchmark hello_world              # Benchmark AI models on hello_world problem set
-  python cli.py benchmark basic_algorithms --models GPT-4o-mini GPT-4o  # Benchmark specific models
-  python cli.py benchmark --report html            # Generate HTML report
+  uv run cli.py solve P68688_en                    # Solve Hello World problem
+  uv run cli.py solve P68688_en --compiler G++17   # Use C++ compiler
+  uv run cli.py solve --batch problems.txt         # Solve multiple problems
+  uv run cli.py config                             # Setup configuration
+  uv run cli.py benchmark hello_world              # Benchmark AI models on hello_world problem set
+  uv run cli.py benchmark basic_algorithms --models GPT-4o-mini GPT-4o  # Benchmark specific models
+  uv run cli.py benchmark --report html            # Generate HTML report
         """
     )
     
