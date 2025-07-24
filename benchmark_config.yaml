@@ -1,6 +1,106 @@
 # Jutge AI Model Benchmark Configuration
 models:
-  - name: "GPT-4o-mini"
+  - name: "Claude-Sonnet-4"
+    provider: "openrouter"
+    model_id: "anthropic/claude-sonnet-4"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "Gemini-2.0-Flash-001"
+    provider: "openrouter"
+    model_id: "google/gemini-2.0-flash-001"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "Gemini-2.5-Flash"
+    provider: "openrouter"
+    model_id: "google/gemini-2.5-flash"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "DeepSeek-Chat-V3-0324-Free"
+    provider: "openrouter"
+    model_id: "deepseek/deepseek-chat-v3-0324:free"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "Gemini-2.5-Pro"
+    provider: "openrouter"
+    model_id: "google/gemini-2.5-pro"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "Gemini-2.5-Flash-Preview-05-20"
+    provider: "openrouter"
+    model_id: "google/gemini-2.5-flash-preview-05-20"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "DeepSeek-Chat-V3-0324"
+    provider: "openrouter"
+    model_id: "deepseek/deepseek-chat-v3-0324"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "Claude-3.7-Sonnet"
+    provider: "openrouter"
+    model_id: "anthropic/claude-3.7-sonnet"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "Gemini-2.5-Flash-Lite-Preview-06-17"
+    provider: "openrouter"
+    model_id: "google/gemini-2.5-flash-lite-preview-06-17"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "DeepSeek-R1-0528-Free"
+    provider: "openrouter"
+    model_id: "deepseek/deepseek-r1-0528:free"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "GPT-4o-Mini"
     provider: "openrouter"
     model_id: "openai/gpt-4o-mini"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
@@ -10,9 +110,9 @@ models:
     timeout: 30
     enabled: true
 
-  - name: "GPT-4o"
+  - name: "Mistral-Nemo"
     provider: "openrouter"
-    model_id: "openai/gpt-4o"
+    model_id: "mistralai/mistral-nemo"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
     max_tokens: 2000
@@ -20,25 +120,85 @@ models:
     timeout: 30
     enabled: true
 
-  - name: "Claude-3.5-Sonnet"
+  - name: "Gemini-2.5-Flash-Preview"
     provider: "openrouter"
-    model_id: "anthropic/claude-3-5-sonnet-20241022"
+    model_id: "google/gemini-2.5-flash-preview"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
     max_tokens: 2000
     temperature: 0.1
     timeout: 30
-    enabled: false  # Disabled by default, enable if API key is available
+    enabled: true
 
-  - name: "Gemini-Pro"
+  - name: "GPT-4.1"
     provider: "openrouter"
-    model_id: "google/gemini-pro"
+    model_id: "openai/gpt-4.1"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
     max_tokens: 2000
     temperature: 0.1
     timeout: 30
-    enabled: false  # Disabled by default, enable if API key is available
+    enabled: true
+
+  - name: "DeepSeek-R1-Free"
+    provider: "openrouter"
+    model_id: "deepseek/deepseek-r1:free"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "GPT-4.1-Mini"
+    provider: "openrouter"
+    model_id: "openai/gpt-4.1-mini"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "Gemini-2.0-Flash-Lite-001"
+    provider: "openrouter"
+    model_id: "google/gemini-2.0-flash-lite-001"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "Llama-3.3-70B-Instruct"
+    provider: "openrouter"
+    model_id: "meta-llama/llama-3.3-70b-instruct"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "Llama-4-Maverick"
+    provider: "openrouter"
+    model_id: "meta-llama/llama-4-maverick"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
+
+  - name: "Claude-Opus-4"
+    provider: "openrouter"
+    model_id: "anthropic/claude-opus-4"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
+    max_tokens: 2000
+    temperature: 0.1
+    timeout: 30
+    enabled: true
 
 problem_sets:
   hello_world:
