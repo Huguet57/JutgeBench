@@ -49,8 +49,8 @@ vi .env
 
 Add your credentials to `.env`:
 ```bash
-# OpenAI API Configuration
-OPENAI_API_KEY=your-openai-api-key-here
+# OpenRouter API Configuration
+OPENROUTER_API_KEY=your-openrouter-key-here
 
 # Jutge Credentials
 JUTGE_EMAIL=your-email@example.com
@@ -63,9 +63,9 @@ JUTGE_PASSWORD=your-password
 uv run python cli.py config
 ```
 
-### 3. Get Your API Keys
+### 3. Get Your API Key
 
-- **OpenAI API Key**: Get from [OpenAI Platform](https://platform.openai.com/api-keys)
+- **OpenRouter API Key**: Get from [OpenRouter](https://openrouter.ai/)
 - **Jutge Account**: Register at [Jutge.org](https://jutge.org/)
 
 ### 4. Test the Setup
@@ -155,18 +155,19 @@ uv run python cli.py test
 
 ### Credentials (.env file)
 All sensitive credentials are stored in `.env` file:
-- `OPENAI_API_KEY`: Your OpenAI API key
-- `JUTGE_EMAIL`: Your Jutge account email  
+- `OPENROUTER_API_KEY`: Your OpenRouter API key
+- `JUTGE_EMAIL`: Your Jutge account email
 - `JUTGE_PASSWORD`: Your Jutge account password
 - `OPENAI_MODEL`: (Optional) Override default model
 
 ### Non-sensitive Settings (config.yaml)
 Optional configuration file for non-sensitive settings:
 
-**OpenAI Settings**
+**OpenAI/OpenRouter Settings**
 - `model`: GPT model to use (`gpt-4o-mini` for cost-effective, `gpt-4o` for best results)
 - `max_tokens`: Maximum tokens per response
 - `temperature`: Creativity level (0.0-1.0, lower = more deterministic)
+- `base_url`: (Optional) Override API base URL for OpenRouter
 
 **Jutge Settings**
 - `default_compiler`: Default programming language

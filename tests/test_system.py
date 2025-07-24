@@ -62,8 +62,8 @@ def test_openai_setup():
     config.load_env_file()
     
     if not config.openai.api_key:
-        print("❌ OpenAI API key not found in environment")
-        print("   Please add OPENAI_API_KEY to your .env file")
+        print("❌ OpenRouter API key not found in environment")
+        print("   Please add OPENROUTER_API_KEY to your .env file")
         return False
     
     try:

@@ -443,10 +443,10 @@ def setup_interactive_config():
         if not Confirm.ask("Do you want to update it?"):
             return
     
-    # Get OpenAI API key
-    console.print("\\n[bold]OpenAI Configuration[/bold]")
-    console.print("Get your API key from: https://platform.openai.com/api-keys")
-    openai_key = Prompt.ask("Enter your OpenAI API key", password=True)
+    # Get OpenRouter API key
+    console.print("\\n[bold]OpenRouter Configuration[/bold]")
+    console.print("Get your API key from: https://openrouter.ai/")
+    openai_key = Prompt.ask("Enter your OpenRouter API key", password=True)
     
     # Get Jutge credentials
     console.print("\\n[bold]Jutge Credentials[/bold]")
@@ -458,8 +458,8 @@ def setup_interactive_config():
     env_content = f"""# Jutge Problem Solver Environment Variables
 # Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-# OpenAI API Configuration
-OPENAI_API_KEY={openai_key}
+# OpenRouter API Configuration
+OPENROUTER_API_KEY={openai_key}
 
 # Jutge Platform Credentials
 JUTGE_EMAIL={jutge_email}
@@ -480,9 +480,9 @@ def setup_default_config():
         env_example_content = """# Jutge Problem Solver Environment Variables
 # Copy this file to .env and fill in your actual credentials
 
-# OpenAI API Configuration
-# Get your API key from: https://platform.openai.com/api-keys
-OPENAI_API_KEY=your-openai-api-key-here
+# OpenRouter API Configuration
+# Get your API key from: https://openrouter.ai/
+OPENROUTER_API_KEY=your-openrouter-key-here
 
 # Optional: Override default model
 # OPENAI_MODEL=gpt-4o-mini

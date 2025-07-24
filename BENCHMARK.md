@@ -9,11 +9,9 @@ The benchmark feature allows you to compare the performance of different AI mode
 uv sync --extra benchmark
 ```
 
-2. Set up your API keys:
+2. Set up your API key:
 ```bash
-export OPENAI_API_KEY="your-openai-key"
-export ANTHROPIC_API_KEY="your-anthropic-key"  # Optional
-export GOOGLE_API_KEY="your-google-key"        # Optional
+export OPENROUTER_API_KEY="your-openrouter-key"
 ```
 
 3. Run a benchmark:
@@ -49,7 +47,7 @@ Edit `benchmark_config.yaml` to add new AI models:
 ```yaml
 models:
   - name: "Your-Model-Name"
-    provider: "openai"  # or "anthropic", "google"
+    provider: "openrouter"
     model_id: "model-api-id"
     api_key: null  # Uses environment variable
     max_tokens: 2000

@@ -1,36 +1,40 @@
 # Jutge AI Model Benchmark Configuration
 models:
   - name: "GPT-4o-mini"
-    provider: "openai"
-    model_id: "gpt-4o-mini"
-    api_key: null  # Will use OPENAI_API_KEY environment variable
+    provider: "openrouter"
+    model_id: "openai/gpt-4o-mini"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
     max_tokens: 2000
     temperature: 0.1
     timeout: 30
     enabled: true
 
   - name: "GPT-4o"
-    provider: "openai"
-    model_id: "gpt-4o"
-    api_key: null  # Will use OPENAI_API_KEY environment variable
+    provider: "openrouter"
+    model_id: "openai/gpt-4o"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
     max_tokens: 2000
     temperature: 0.1
     timeout: 30
     enabled: true
 
   - name: "Claude-3.5-Sonnet"
-    provider: "anthropic"
-    model_id: "claude-3-5-sonnet-20241022"
-    api_key: null  # Will use ANTHROPIC_API_KEY environment variable
+    provider: "openrouter"
+    model_id: "anthropic/claude-3-5-sonnet-20241022"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
     max_tokens: 2000
     temperature: 0.1
     timeout: 30
     enabled: false  # Disabled by default, enable if API key is available
 
   - name: "Gemini-Pro"
-    provider: "google"
-    model_id: "gemini-pro"
-    api_key: null  # Will use GOOGLE_API_KEY environment variable
+    provider: "openrouter"
+    model_id: "google/gemini-pro"
+    api_key: null  # Will use OPENROUTER_API_KEY environment variable
+    base_url: "https://openrouter.ai/api/v1"
     max_tokens: 2000
     temperature: 0.1
     timeout: 30

@@ -83,6 +83,8 @@ class AIModelAdapter:
         """Create the appropriate client based on provider"""
         if self.config.provider == "openai":
             return OpenAI(api_key=self.config.api_key)
+        elif self.config.provider == "openrouter":
+            return OpenAI(api_key=self.config.api_key, base_url=self.config.base_url or "https://openrouter.ai/api/v1")
         elif self.config.provider == "anthropic":
             if not HAS_ANTHROPIC:
                 raise ValueError("Anthropic library not installed. Run: pip install anthropic")
@@ -101,7 +103,7 @@ class AIModelAdapter:
         
         start_time = time.time()
         
-        if self.config.provider == "openai":
+        if self.config.provider in {"openai", "openrouter"}:
             response = self.client.chat.completions.create(
                 model=self.config.model_id,
                 messages=[
