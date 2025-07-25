@@ -904,7 +904,9 @@ def generate_html_report(results: dict):
     
     # Add model details cards
     for model_name, config in model_configs.items():
-        stats = results.get('model_stats', {}).get(model_name, {})
+        # Handle both old and new data structures
+        model_stats = results.get('model_stats', results.get('summary', {}).get('model_stats', {}))
+        stats = model_stats.get(model_name, {})
         success_rate = stats.get('success_rate', 0)
         success_class = 'high-success' if success_rate >= 80 else 'low-success' if success_rate < 50 else 'medium-success'
         
