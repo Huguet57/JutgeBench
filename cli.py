@@ -36,6 +36,7 @@ Examples:
   uv run cli.py benchmark hello_world              # Benchmark AI models on hello_world problem set
   uv run cli.py benchmark basic_algorithms --models GPT-4o-mini GPT-4o  # Benchmark specific models
   uv run cli.py benchmark --report html            # Generate HTML report
+  uv run cli.py benchmark --parallel               # Run models in parallel for faster execution
         """
     )
     
@@ -254,7 +255,7 @@ def display_benchmark_summary(results: dict):
 def generate_csv_report(results: dict):
     """Generate CSV report from benchmark results"""
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f"benchmark_report_{timestamp}.csv"
+    filename = f"results/benchmark_report_{timestamp}.csv"
     
     with open(filename, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
@@ -275,58 +276,413 @@ def generate_csv_report(results: dict):
 
 
 def generate_html_report(results: dict):
-    """Generate HTML report from benchmark results"""
+    """Generate enhanced HTML report from benchmark results with detailed submission information"""
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f"benchmark_report_{timestamp}.html"
+    filename = f"results/benchmark_report_{timestamp}.html"
+    
+    # Group individual results by model for detailed display
+    results_by_model = {}
+    individual_results = results.get('results', [])
+    
+    for result in individual_results:
+        model = result.get('model_name', 'Unknown Model')
+        if model not in results_by_model:
+            results_by_model[model] = []
+        results_by_model[model].append(result)
     
     html_content = f"""
+    <!DOCTYPE html>
     <html>
     <head>
         <title>Jutge AI Benchmark Report</title>
         <style>
-            body {{ font-family: Arial, sans-serif; margin: 40px; }}
-            h1 {{ color: #333; }}
-            table {{ border-collapse: collapse; width: 100%; }}
-            th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-            th {{ background-color: #4CAF50; color: white; }}
-            tr:nth-child(even) {{ background-color: #f2f2f2; }}
-            .success {{ color: green; font-weight: bold; }}
-            .failed {{ color: red; font-weight: bold; }}
+            body {{ 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                margin: 40px; 
+                background: #f8f9fa; 
+                line-height: 1.6;
+            }}
+            .container {{ 
+                max-width: 1200px; 
+                margin: 0 auto; 
+                background: white; 
+                padding: 40px; 
+                border-radius: 8px; 
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }}
+            h1 {{ color: #2c3e50; margin-bottom: 10px; }}
+            h2 {{ color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
+            h3 {{ color: #2c3e50; margin-top: 30px; }}
+            .meta {{ color: #7f8c8d; margin-bottom: 30px; }}
+            
+            /* Summary table */
+            .summary-table {{ 
+                border-collapse: collapse; 
+                width: 100%; 
+                margin-bottom: 40px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            }}
+            .summary-table th {{ 
+                background: linear-gradient(135deg, #3498db, #2980b9); 
+                color: white; 
+                padding: 15px 12px;
+                text-align: left;
+                font-weight: 600;
+            }}
+            .summary-table td {{ 
+                padding: 12px; 
+                border-bottom: 1px solid #ecf0f1;
+            }}
+            .summary-table tr:hover {{ background-color: #f8f9fa; }}
+            
+            /* Detailed results */
+            .model-section {{ 
+                margin: 40px 0; 
+                border: 1px solid #ddd; 
+                border-radius: 8px; 
+                overflow: hidden;
+            }}
+            .model-header {{ 
+                background: linear-gradient(135deg, #2c3e50, #34495e); 
+                color: white; 
+                padding: 15px 20px; 
+                cursor: pointer;
+                user-select: none;
+            }}
+            .model-header:hover {{ background: linear-gradient(135deg, #34495e, #2c3e50); }}
+            .model-content {{ 
+                display: none; 
+                padding: 20px; 
+                background: #fafbfc;
+            }}
+            .model-content.expanded {{ display: block; }}
+            
+            /* Problem results table */
+            .results-table {{ 
+                width: 100%; 
+                border-collapse: collapse; 
+                margin-bottom: 20px;
+                background: white;
+            }}
+            .results-table th {{ 
+                background: #34495e; 
+                color: white; 
+                padding: 12px 8px; 
+                text-align: left;
+                font-size: 14px;
+            }}
+            .results-table td {{ 
+                padding: 10px 8px; 
+                border-bottom: 1px solid #eee; 
+                vertical-align: top;
+            }}
+            .results-table tr:hover {{ background-color: #f1f2f6; }}
+            
+            /* Code sections */
+            .code-section {{ 
+                margin: 15px 0; 
+                border: 1px solid #ddd; 
+                border-radius: 6px; 
+                overflow: hidden;
+            }}
+            .code-header {{ 
+                background: #f4f4f4; 
+                padding: 8px 12px; 
+                font-weight: 600; 
+                font-size: 14px;
+                color: #2c3e50;
+                cursor: pointer;
+                user-select: none;
+                border-bottom: 1px solid #ddd;
+            }}
+            .code-header:hover {{ background: #e8e8e8; }}
+            .code-content {{ 
+                display: none; 
+                background: #2f3640; 
+                color: #f5f6fa; 
+                padding: 15px; 
+                font-family: 'Monaco', 'Consolas', monospace; 
+                font-size: 13px; 
+                line-height: 1.4;
+                white-space: pre-wrap; 
+                overflow-x: auto;
+            }}
+            .code-content.expanded {{ display: block; }}
+            
+            /* Status styling */
+            .verdict-AC {{ color: #27ae60; font-weight: bold; }}
+            .verdict-WA {{ color: #e74c3c; font-weight: bold; }}
+            .verdict-TLE {{ color: #f39c12; font-weight: bold; }}
+            .verdict-CE {{ color: #9b59b6; font-weight: bold; }}
+            .verdict-RE {{ color: #e67e22; font-weight: bold; }}
+            .verdict-NULL {{ color: #95a5a6; font-weight: bold; }}
+            
+            .success {{ color: #27ae60; font-weight: bold; }}
+            .failed {{ color: #e74c3c; font-weight: bold; }}
+            .warning {{ color: #f39c12; font-weight: bold; }}
+            
+            /* Metrics */
+            .metrics {{ 
+                display: grid; 
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
+                gap: 10px; 
+                margin: 15px 0;
+                font-size: 14px;
+            }}
+            .metric {{ 
+                background: white; 
+                padding: 8px 12px; 
+                border-radius: 4px; 
+                border-left: 4px solid #3498db;
+            }}
+            .metric-label {{ font-weight: 600; color: #2c3e50; }}
+            .metric-value {{ color: #7f8c8d; }}
+            
+            /* Utility classes */
+            .toggle-all {{ 
+                background: #3498db; 
+                color: white; 
+                border: none; 
+                padding: 10px 20px; 
+                border-radius: 5px; 
+                cursor: pointer; 
+                margin-bottom: 20px;
+                font-size: 14px;
+            }}
+            .toggle-all:hover {{ background: #2980b9; }}
+            
+            .error-message {{ 
+                background: #fee; 
+                color: #c62828; 
+                padding: 10px; 
+                border-radius: 4px; 
+                border-left: 4px solid #e53e3e; 
+                margin: 10px 0;
+                font-size: 14px;
+            }}
         </style>
+        <script>
+            function toggleModel(modelId) {{
+                console.log('Toggling model:', modelId);
+                const content = document.getElementById(modelId);
+                if (!content) {{
+                    console.error('Content element not found:', modelId);
+                    return;
+                }}
+                const header = content.previousElementSibling;
+                content.classList.toggle('expanded');
+                const isExpanded = content.classList.contains('expanded');
+                console.log('Model expanded:', isExpanded);
+                header.innerHTML = isExpanded ? 
+                    header.innerHTML.replace('▶', '▼') : 
+                    header.innerHTML.replace('▼', '▶');
+            }}
+            
+            function toggleCode(codeId) {{
+                console.log('Toggling code:', codeId);
+                const content = document.getElementById(codeId);
+                if (!content) {{
+                    console.error('Code element not found:', codeId);
+                    return;
+                }}
+                const header = content.previousElementSibling;
+                content.classList.toggle('expanded');
+                const isExpanded = content.classList.contains('expanded');
+                header.innerHTML = isExpanded ? 
+                    header.innerHTML.replace('▶', '▼') : 
+                    header.innerHTML.replace('▼', '▶');
+            }}
+            
+            function toggleAll() {{
+                console.log('Toggle all clicked');
+                const contents = document.querySelectorAll('.model-content');
+                console.log('Found model contents:', contents.length);
+                
+                if (contents.length === 0) {{
+                    console.warn('No model content sections found!');
+                    return;
+                }}
+                
+                const allExpanded = Array.from(contents).every(c => c.classList.contains('expanded'));
+                console.log('All expanded:', allExpanded);
+                
+                contents.forEach((content, index) => {{
+                    const header = content.previousElementSibling;
+                    console.log(`Processing content ${{index}}, expanded: ${{content.classList.contains('expanded')}}`);
+                    if (allExpanded) {{
+                        content.classList.remove('expanded');
+                        header.innerHTML = header.innerHTML.replace('▼', '▶');
+                    }} else {{
+                        content.classList.add('expanded');
+                        header.innerHTML = header.innerHTML.replace('▶', '▼');
+                    }}
+                }});
+                
+                const toggleButton = document.querySelector('.toggle-all');
+                if (toggleButton) {{
+                    toggleButton.textContent = allExpanded ? 'Expand All Models' : 'Collapse All Models';
+                }}
+            }}
+            
+            // Debug function to check DOM state
+            window.debugReport = function() {{
+                console.log('=== Debug Report ===');
+                console.log('Model sections:', document.querySelectorAll('.model-section').length);
+                console.log('Model contents:', document.querySelectorAll('.model-content').length);
+                console.log('Code sections:', document.querySelectorAll('.code-section').length);
+                console.log('Toggle button:', document.querySelector('.toggle-all'));
+                document.querySelectorAll('.model-content').forEach((el, i) => {{
+                    console.log(`Model content ${{i}}:`, el.id, el.classList.contains('expanded'));
+                }});
+            }}
+        </script>
     </head>
     <body>
-        <h1>Jutge AI Model Benchmark Report</h1>
-        <p>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-        <p>Total benchmark time: {results['benchmark_time']:.2f} seconds</p>
-        
-        <table>
-            <tr>
-                <th>Model</th>
-                <th>Problems</th>
-                <th>Solved</th>
-                <th>Failed</th>
-                <th>Success Rate</th>
-                <th>Avg Time</th>
-                <th>Total Tokens</th>
-            </tr>
+        <div class="container">
+            <h1>Jutge AI Model Benchmark Report</h1>
+            <div class="meta">
+                <p><strong>Generated:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                <p><strong>Problem Set:</strong> {results.get('problem_set', 'Unknown')}</p>
+                <p><strong>Total Benchmark Time:</strong> {results.get('benchmark_time', 0):.2f} seconds</p>
+            </div>
+            
+            <h2>Summary</h2>
+            <table class="summary-table">
+                <tr>
+                    <th>Model</th>
+                    <th>Problems</th>
+                    <th>Solved</th>
+                    <th>Failed</th>
+                    <th>Success Rate</th>
+                    <th>Avg Time</th>
+                    <th>Total Tokens</th>
+                </tr>
     """
     
-    for model_name, stats in results['model_stats'].items():
-        success_class = 'success' if stats['success_rate'] >= 80 else 'failed' if stats['success_rate'] < 50 else ''
+    # Add summary rows
+    for model_name, stats in results.get('model_stats', {}).items():
+        success_class = 'success' if stats['success_rate'] >= 80 else 'failed' if stats['success_rate'] < 50 else 'warning'
         html_content += f"""
-            <tr>
-                <td>{model_name}</td>
-                <td>{stats['total_problems']}</td>
-                <td class="success">{stats['solved']}</td>
-                <td class="failed">{stats['failed'] + stats['errors']}</td>
-                <td class="{success_class}">{stats['success_rate']:.1f}%</td>
-                <td>{stats['avg_time_per_problem']:.2f}s</td>
-                <td>{stats['total_tokens']}</td>
-            </tr>
+                <tr>
+                    <td><strong>{model_name}</strong></td>
+                    <td>{stats['total_problems']}</td>
+                    <td class="success">{stats['solved']}</td>
+                    <td class="failed">{stats.get('failed', 0) + stats.get('errors', 0)}</td>
+                    <td class="{success_class}">{stats['success_rate']:.1f}%</td>
+                    <td>{stats.get('avg_time_per_problem', 0):.2f}s</td>
+                    <td>{stats.get('total_tokens', 0):,}</td>
+                </tr>
         """
     
     html_content += """
-        </table>
+            </table>
+            
+            <h2>Detailed Results</h2>
+    """
+    
+    # Only show toggle button and model sections if we have results
+    if results_by_model:
+        html_content += """
+            <button class="toggle-all" onclick="toggleAll()">Expand All Models</button>
+        """
+        
+        # Add detailed results for each model
+        for model_name, model_results in results_by_model.items():
+            model_id = model_name.replace(' ', '').replace('-', '').replace('.', '')
+            html_content += f"""
+            <div class="model-section">
+                <div class="model-header" onclick="toggleModel('{model_id}-content')">
+                    ▶ {model_name} ({len(model_results)} problems)
+                </div>
+                <div id="{model_id}-content" class="model-content">
+                    <table class="results-table">
+                        <tr>
+                            <th>Problem</th>
+                            <th>Verdict</th>
+                            <th>Submission ID</th>
+                            <th>Language</th>
+                            <th>Time</th>
+                            <th>Tokens</th>
+                            <th>Attempts</th>
+                        </tr>
+            """
+            
+            for result in model_results:
+                verdict = result.get('verdict', 'NULL')
+                verdict_class = f'verdict-{verdict}' if verdict else 'verdict-NULL'
+                error_msg = result.get('error', '')
+                
+                html_content += f"""
+                        <tr>
+                            <td><strong>{result.get('problem_id', 'Unknown')}</strong></td>
+                            <td class="{verdict_class}">{verdict or 'NULL'}</td>
+                            <td>{result.get('submission_id', 'N/A')}</td>
+                            <td>{result.get('language', 'Unknown')}</td>
+                            <td>{result.get('total_time', 0):.2f}s</td>
+                            <td>{result.get('tokens_used', 0):,}</td>
+                            <td>{result.get('attempts', 1)}</td>
+                        </tr>
+                """
+                
+                # Add detailed metrics and code for this problem
+                html_content += f"""
+                        <tr>
+                            <td colspan="7">
+                                <div class="metrics">
+                                    <div class="metric">
+                                        <div class="metric-label">Generation Time</div>
+                                        <div class="metric-value">{result.get('generation_time', 0):.2f}s</div>
+                                    </div>
+                                    <div class="metric">
+                                        <div class="metric-label">Submission Time</div>
+                                        <div class="metric-value">{result.get('submission_time', 0):.2f}s</div>
+                                    </div>
+                                    <div class="metric">
+                                        <div class="metric-label">Success</div>
+                                        <div class="metric-value">{'✓ Yes' if result.get('success') else '✗ No'}</div>
+                                    </div>
+                                    <div class="metric">
+                                        <div class="metric-label">Timestamp</div>
+                                        <div class="metric-value">{result.get('timestamp', 'Unknown')}</div>
+                                    </div>
+                                </div>
+                """
+                
+                # Add error message if present
+                if error_msg:
+                    html_content += f"""
+                                <div class="error-message">
+                                    <strong>Error:</strong> {error_msg}
+                                </div>
+                    """
+                
+                # Add code section
+                solution_code = result.get('solution_code', '')
+                if solution_code:
+                    code_id = f"{model_id}{result.get('problem_id', 'unknown')}code".replace('_', '').replace('-', '')
+                    html_content += f"""
+                                <div class="code-section">
+                                    <div class="code-header" onclick="toggleCode('{code_id}')">
+                                        ▶ Generated Solution Code
+                                    </div>
+                                    <div id="{code_id}" class="code-content">{solution_code}</div>
+                                </div>
+                    """
+                
+                html_content += "</td></tr>"
+            
+            html_content += """
+                    </table>
+                </div>
+            </div>
+            """
+    else:
+        html_content += """
+            <p><em>No detailed results available. This may happen if the benchmark data doesn't contain individual submission results.</em></p>
+        """
+    
+    html_content += """
+        </div>
     </body>
     </html>
     """
@@ -334,7 +690,7 @@ def generate_html_report(results: dict):
     with open(filename, 'w') as f:
         f.write(html_content)
     
-    console.print(f"[green]✓ HTML report saved to {filename}[/green]")
+    console.print(f"[green]✓ Enhanced HTML report saved to {filename}[/green]")
 
 
 def solve_single(solver: JutgeProblemSolver, problem_id: str, compiler_id: Optional[str]):
