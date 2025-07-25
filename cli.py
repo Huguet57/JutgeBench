@@ -290,6 +290,38 @@ def generate_html_report(results: dict):
             results_by_model[model] = []
         results_by_model[model].append(result)
     
+    # Extract model configurations from results
+    model_configs = {}
+    benchmark_config = results.get('config', {})
+    
+    # Get model configurations from the benchmark config if available
+    for result in individual_results:
+        model_name = result.get('model_name', 'Unknown Model')
+        if model_name not in model_configs:
+            # Try to find model config in benchmark config
+            model_config = None
+            if 'models' in benchmark_config:
+                for model in benchmark_config['models']:
+                    if model.get('name') == model_name:
+                        model_config = model
+                        break
+            
+            if model_config:
+                model_configs[model_name] = {
+                    'name': model_name,
+                    'provider': model_config.get('provider', 'Unknown'),
+                    'model_id': model_config.get('model_id', 'Unknown'),
+                    'description': f"{model_config.get('provider', 'AI')} {model_config.get('model_id', 'model')} for competitive programming"
+                }
+            else:
+                # Fallback for when config is not available
+                model_configs[model_name] = {
+                    'name': model_name,
+                    'provider': 'Unknown',
+                    'model_id': 'Unknown',
+                    'description': f'AI model used for competitive programming problem solving'
+                }
+    
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -315,6 +347,108 @@ def generate_html_report(results: dict):
             h3 {{ color: #2c3e50; margin-top: 30px; }}
             .meta {{ color: #7f8c8d; margin-bottom: 30px; }}
             
+            /* Model Details Grid */
+            .model-details-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+                gap: 20px;
+                margin-bottom: 40px;
+            }}
+            
+            .model-card {{
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+                overflow: hidden;
+                transition: transform 0.2s ease, box-shadow 0.2s ease;
+            }}
+            
+            .model-card:hover {{
+                transform: translateY(-2px);
+                box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            }}
+            
+            .model-card-header {{
+                padding: 20px;
+                background: linear-gradient(135deg, #2c3e50, #34495e);
+                color: white;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }}
+            
+            .model-card-header h3 {{
+                margin: 0;
+                font-size: 18px;
+                font-weight: 600;
+            }}
+            
+            .success-badge {{
+                background: rgba(255,255,255,0.2);
+                padding: 8px 12px;
+                border-radius: 20px;
+                font-weight: bold;
+                font-size: 14px;
+            }}
+            
+            .high-success .success-badge {{ background: rgba(39,174,96,0.2); }}
+            .medium-success .success-badge {{ background: rgba(241,196,15,0.2); }}
+            .low-success .success-badge {{ background: rgba(231,76,60,0.2); }}
+            
+            .model-card-body {{
+                padding: 20px;
+            }}
+            
+            .model-info {{
+                margin-bottom: 20px;
+            }}
+            
+            .info-item {{
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 8px;
+                padding: 4px 0;
+            }}
+            
+            .info-label {{
+                font-weight: 600;
+                color: #2c3e50;
+            }}
+            
+            .info-value {{
+                color: #7f8c8d;
+                font-family: 'Monaco', 'Consolas', monospace;
+                font-size: 13px;
+            }}
+            
+            .model-stats {{
+                display: grid;
+                grid-template-columns: repeat(5, 1fr);
+                gap: 15px;
+                margin-top: 15px;
+            }}
+            
+            .stat-item {{
+                text-align: center;
+                padding: 10px 5px;
+                background: #f8f9fa;
+                border-radius: 8px;
+            }}
+            
+            .stat-value {{
+                font-size: 18px;
+                font-weight: bold;
+                color: #2c3e50;
+                margin-bottom: 4px;
+            }}
+            
+            .stat-label {{
+                font-size: 12px;
+                color: #7f8c8d;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }}
+
             /* Summary table */
             .summary-table {{ 
                 border-collapse: collapse; 
@@ -378,36 +512,214 @@ def generate_html_report(results: dict):
             }}
             .results-table tr:hover {{ background-color: #f1f2f6; }}
             
-            /* Code sections */
-            .code-section {{ 
-                margin: 15px 0; 
-                border: 1px solid #ddd; 
-                border-radius: 6px; 
+            /* Problem Cards */
+            .problem-card {{
+                background: white;
+                border-radius: 8px;
+                margin-bottom: 25px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                border-left: 4px solid #ccc;
                 overflow: hidden;
             }}
-            .code-header {{ 
-                background: #f4f4f4; 
-                padding: 8px 12px; 
-                font-weight: 600; 
-                font-size: 14px;
-                color: #2c3e50;
-                cursor: pointer;
-                user-select: none;
-                border-bottom: 1px solid #ddd;
+            
+            .success-card {{ border-left-color: #27ae60; }}
+            .failed-card {{ border-left-color: #e74c3c; }}
+            .error-card {{ border-left-color: #f39c12; }}
+            
+            .problem-header {{
+                background: #f8f9fa;
+                padding: 15px 20px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 1px solid #e9ecef;
             }}
-            .code-header:hover {{ background: #e8e8e8; }}
-            .code-content {{ 
-                display: none; 
-                background: #2f3640; 
-                color: #f5f6fa; 
-                padding: 15px; 
-                font-family: 'Monaco', 'Consolas', monospace; 
-                font-size: 13px; 
+            
+            .problem-header h4 {{
+                margin: 0;
+                color: #2c3e50;
+                font-size: 16px;
+            }}
+            
+            .problem-meta {{
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }}
+            
+            .verdict-badge, .time-badge, .token-badge {{
+                padding: 4px 8px;
+                border-radius: 12px;
+                font-size: 12px;
+                font-weight: 600;
+                text-transform: uppercase;
+            }}
+            
+            .verdict-badge.verdict-AC {{ background: #d4edda; color: #155724; }}
+            .verdict-badge.verdict-WA {{ background: #f8d7da; color: #721c24; }}
+            .verdict-badge.verdict-TLE {{ background: #fff3cd; color: #856404; }}
+            .verdict-badge.verdict-CE {{ background: #e2e3f1; color: #6f42c1; }}
+            .verdict-badge.verdict-RE {{ background: #f5c6cb; color: #721c24; }}
+            .verdict-badge.verdict-NULL {{ background: #f8f9fa; color: #6c757d; }}
+            
+            .time-badge {{ background: #e3f2fd; color: #0d47a1; }}
+            .token-badge {{ background: #f3e5f5; color: #4a148c; }}
+            
+            /* Solution Section */
+            .solution-section {{
+                margin: 20px;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                overflow: hidden;
+            }}
+            
+            .solution-header {{
+                background: #2c3e50;
+                color: white;
+                padding: 12px 16px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }}
+            
+            .solution-header h5 {{
+                margin: 0;
+                font-size: 14px;
+                font-weight: 600;
+            }}
+            
+            .copy-btn {{
+                background: rgba(255,255,255,0.1);
+                border: 1px solid rgba(255,255,255,0.2);
+                color: white;
+                padding: 4px 8px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+                transition: background-color 0.2s;
+            }}
+            
+            .copy-btn:hover {{
+                background: rgba(255,255,255,0.2);
+            }}
+            
+            .solution-code {{
+                background: #2f3542;
+                padding: 0;
+                max-height: 400px;
+                overflow-y: auto;
+            }}
+            
+            .solution-code pre {{
+                margin: 0;
+                padding: 16px;
+                color: #f1f2f6;
+                font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+                font-size: 13px;
                 line-height: 1.4;
-                white-space: pre-wrap; 
+                white-space: pre-wrap;
                 overflow-x: auto;
             }}
-            .code-content.expanded {{ display: block; }}
+            
+            .solution-code code {{
+                background: none;
+                color: inherit;
+                padding: 0;
+            }}
+            
+            /* Performance Section */
+            .performance-section {{
+                margin: 20px;
+                background: #f8f9fa;
+                border-radius: 8px;
+                padding: 16px;
+            }}
+            
+            .perf-metrics {{
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                gap: 12px;
+            }}
+            
+            .perf-item {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 8px 12px;
+                background: white;
+                border-radius: 6px;
+                border-left: 3px solid #3498db;
+            }}
+            
+            .perf-label {{
+                font-size: 12px;
+                color: #7f8c8d;
+                font-weight: 600;
+            }}
+            
+            .perf-value {{
+                font-size: 13px;
+                color: #2c3e50;
+                font-weight: 600;
+                font-family: 'Monaco', 'Consolas', monospace;
+            }}
+            
+            /* Error Section */
+            .error-section {{
+                margin: 20px;
+                background: #fff5f5;
+                border: 1px solid #fed7d7;
+                border-radius: 8px;
+                padding: 16px;
+            }}
+            
+            .error-section h5 {{
+                margin: 0 0 10px 0;
+                color: #c53030;
+                font-size: 14px;
+            }}
+            
+            .error-content {{
+                color: #742a2a;
+                font-size: 13px;
+                line-height: 1.4;
+                background: white;
+                padding: 12px;
+                border-radius: 4px;
+                border-left: 4px solid #fc8181;
+            }}
+            
+            /* Submission Section */
+            .submission-section {{
+                margin: 20px;
+                background: #f7fafc;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                padding: 16px;
+            }}
+            
+            .submission-section h5 {{
+                margin: 0 0 10px 0;
+                color: #2d3748;
+                font-size: 14px;
+            }}
+            
+            .submission-content {{
+                background: white;
+                padding: 12px;
+                border-radius: 4px;
+                border-left: 4px solid #4299e1;
+                font-size: 12px;
+                max-height: 200px;
+                overflow-y: auto;
+            }}
+            
+            .submission-content pre {{
+                margin: 0;
+                color: #4a5568;
+                font-family: 'Monaco', 'Consolas', monospace;
+                white-space: pre-wrap;
+            }}
             
             /* Status styling */
             .verdict-AC {{ color: #27ae60; font-weight: bold; }}
@@ -524,12 +836,47 @@ def generate_html_report(results: dict):
                 }}
             }}
             
+            // Copy code functionality
+            function copyCode(codeId) {{
+                const codeElement = document.getElementById(codeId);
+                if (!codeElement) {{
+                    console.error('Code element not found:', codeId);
+                    return;
+                }}
+                
+                const codeText = codeElement.querySelector('pre code');
+                if (!codeText) {{
+                    console.error('Code text not found in:', codeId);
+                    return;
+                }}
+                
+                // Create a temporary textarea to copy the text
+                const textarea = document.createElement('textarea');
+                textarea.value = codeText.textContent;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                
+                // Show visual feedback
+                const copyBtn = codeElement.parentElement.querySelector('.copy-btn');
+                if (copyBtn) {{
+                    const originalText = copyBtn.textContent;
+                    copyBtn.textContent = '✓ Copied!';
+                    copyBtn.style.background = 'rgba(39,174,96,0.3)';
+                    setTimeout(() => {{
+                        copyBtn.textContent = originalText;
+                        copyBtn.style.background = 'rgba(255,255,255,0.1)';
+                    }}, 2000);
+                }}
+            }}
+            
             // Debug function to check DOM state
             window.debugReport = function() {{
                 console.log('=== Debug Report ===');
                 console.log('Model sections:', document.querySelectorAll('.model-section').length);
                 console.log('Model contents:', document.querySelectorAll('.model-content').length);
-                console.log('Code sections:', document.querySelectorAll('.code-section').length);
+                console.log('Problem cards:', document.querySelectorAll('.problem-card').length);
                 console.log('Toggle button:', document.querySelector('.toggle-all'));
                 document.querySelectorAll('.model-content').forEach((el, i) => {{
                     console.log(`Model content ${{i}}:`, el.id, el.classList.contains('expanded'));
@@ -546,7 +893,63 @@ def generate_html_report(results: dict):
                 <p><strong>Total Benchmark Time:</strong> {results.get('benchmark_time', 0):.2f} seconds</p>
             </div>
             
-            <h2>Summary</h2>
+            <h2>Model Details</h2>
+            <div class="model-details-grid">
+    """
+    
+    # Add model details cards
+    for model_name, config in model_configs.items():
+        stats = results.get('model_stats', {}).get(model_name, {})
+        success_rate = stats.get('success_rate', 0)
+        success_class = 'high-success' if success_rate >= 80 else 'low-success' if success_rate < 50 else 'medium-success'
+        
+        html_content += f"""
+                <div class="model-card {success_class}">
+                    <div class="model-card-header">
+                        <h3>{model_name}</h3>
+                        <div class="success-badge">{success_rate:.1f}%</div>
+                    </div>
+                    <div class="model-card-body">
+                        <div class="model-info">
+                            <div class="info-item">
+                                <span class="info-label">Provider:</span>
+                                <span class="info-value">{config['provider']}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Model ID:</span>
+                                <span class="info-value">{config['model_id']}</span>
+                            </div>
+                        </div>
+                        <div class="model-stats">
+                            <div class="stat-item">
+                                <div class="stat-value">{stats.get('total_problems', 0)}</div>
+                                <div class="stat-label">Problems</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value success">{stats.get('solved', 0)}</div>
+                                <div class="stat-label">Solved</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value failed">{stats.get('failed', 0) + stats.get('errors', 0)}</div>
+                                <div class="stat-label">Failed</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">{stats.get('avg_time_per_problem', 0):.2f}s</div>
+                                <div class="stat-label">Avg Time</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">{stats.get('total_tokens', 0):,}</div>
+                                <div class="stat-label">Tokens</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+        """
+    
+    html_content += """
+            </div>
+            
+            <h2>Performance Summary</h2>
             <table class="summary-table">
                 <tr>
                     <th>Model</th>
@@ -577,7 +980,8 @@ def generate_html_report(results: dict):
     html_content += """
             </table>
             
-            <h2>Detailed Results</h2>
+            <h2>Solution Details by Model</h2>
+            <p>Click on any model section to view detailed solutions and submission information.</p>
     """
     
     # Only show toggle button and model sections if we have results
@@ -589,90 +993,105 @@ def generate_html_report(results: dict):
         # Add detailed results for each model
         for model_name, model_results in results_by_model.items():
             model_id = model_name.replace(' ', '').replace('-', '').replace('.', '')
+            success_count = sum(1 for r in model_results if r.get('verdict') == 'AC')
             html_content += f"""
             <div class="model-section">
                 <div class="model-header" onclick="toggleModel('{model_id}-content')">
-                    ▶ {model_name} ({len(model_results)} problems)
+                    ▶ {model_name} - {success_count}/{len(model_results)} solved ({success_count/len(model_results)*100:.1f}%)
                 </div>
                 <div id="{model_id}-content" class="model-content">
-                    <table class="results-table">
-                        <tr>
-                            <th>Problem</th>
-                            <th>Verdict</th>
-                            <th>Submission ID</th>
-                            <th>Language</th>
-                            <th>Time</th>
-                            <th>Tokens</th>
-                            <th>Attempts</th>
-                        </tr>
             """
             
+            # Create individual problem cards instead of a table
             for result in model_results:
+                problem_id = result.get('problem_id', 'Unknown')
                 verdict = result.get('verdict', 'NULL')
                 verdict_class = f'verdict-{verdict}' if verdict else 'verdict-NULL'
                 error_msg = result.get('error', '')
+                solution_code = result.get('solution_code', '')
+                
+                # Determine card style based on result
+                card_class = 'success-card' if verdict == 'AC' else 'error-card' if error_msg else 'failed-card'
                 
                 html_content += f"""
-                        <tr>
-                            <td><strong>{result.get('problem_id', 'Unknown')}</strong></td>
-                            <td class="{verdict_class}">{verdict or 'NULL'}</td>
-                            <td>{result.get('submission_id', 'N/A')}</td>
-                            <td>{result.get('language', 'Unknown')}</td>
-                            <td>{result.get('total_time', 0):.2f}s</td>
-                            <td>{result.get('tokens_used', 0):,}</td>
-                            <td>{result.get('attempts', 1)}</td>
-                        </tr>
+                    <div class="problem-card {card_class}">
+                        <div class="problem-header">
+                            <h4>Problem {problem_id}</h4>
+                            <div class="problem-meta">
+                                <span class="verdict-badge {verdict_class}">{verdict or 'NULL'}</span>
+                                <span class="time-badge">{result.get('total_time', 0):.2f}s</span>
+                                <span class="token-badge">{result.get('tokens_used', 0):,} tokens</span>
+                            </div>
+                        </div>
                 """
                 
-                # Add detailed metrics and code for this problem
+                # Solution code section - make it prominent
+                if solution_code:
+                    code_id = f"{model_id}{problem_id}code".replace('_', '').replace('-', '')
+                    html_content += f"""
+                        <div class="solution-section">
+                            <div class="solution-header">
+                                <h5>💡 Generated Solution</h5>
+                                <button class="copy-btn" onclick="copyCode('{code_id}')">📋 Copy</button>
+                            </div>
+                            <div class="solution-code" id="{code_id}">
+                                <pre><code>{solution_code}</code></pre>
+                            </div>
+                        </div>
+                    """
+                
+                # Performance metrics
                 html_content += f"""
-                        <tr>
-                            <td colspan="7">
-                                <div class="metrics">
-                                    <div class="metric">
-                                        <div class="metric-label">Generation Time</div>
-                                        <div class="metric-value">{result.get('generation_time', 0):.2f}s</div>
-                                    </div>
-                                    <div class="metric">
-                                        <div class="metric-label">Submission Time</div>
-                                        <div class="metric-value">{result.get('submission_time', 0):.2f}s</div>
-                                    </div>
-                                    <div class="metric">
-                                        <div class="metric-label">Success</div>
-                                        <div class="metric-value">{'✓ Yes' if result.get('success') else '✗ No'}</div>
-                                    </div>
-                                    <div class="metric">
-                                        <div class="metric-label">Timestamp</div>
-                                        <div class="metric-value">{result.get('timestamp', 'Unknown')}</div>
-                                    </div>
+                        <div class="performance-section">
+                            <div class="perf-metrics">
+                                <div class="perf-item">
+                                    <span class="perf-label">Generation Time:</span>
+                                    <span class="perf-value">{result.get('generation_time', 0):.2f}s</span>
                                 </div>
+                                <div class="perf-item">
+                                    <span class="perf-label">Submission Time:</span>
+                                    <span class="perf-value">{result.get('submission_time', 0):.2f}s</span>
+                                </div>
+                                <div class="perf-item">
+                                    <span class="perf-label">Attempts:</span>
+                                    <span class="perf-value">{result.get('attempts', 1)}</span>
+                                </div>
+                                <div class="perf-item">
+                                    <span class="perf-label">Language:</span>
+                                    <span class="perf-value">{result.get('language', 'Unknown')}</span>
+                                </div>
+                            </div>
+                        </div>
                 """
                 
-                # Add error message if present
+                # Error information if present
                 if error_msg:
                     html_content += f"""
-                                <div class="error-message">
-                                    <strong>Error:</strong> {error_msg}
-                                </div>
+                        <div class="error-section">
+                            <h5>❌ Error Details</h5>
+                            <div class="error-content">
+                                {error_msg}
+                            </div>
+                        </div>
                     """
                 
-                # Add code section
-                solution_code = result.get('solution_code', '')
-                if solution_code:
-                    code_id = f"{model_id}{result.get('problem_id', 'unknown')}code".replace('_', '').replace('-', '')
+                # Submission details if available
+                submission_details = result.get('submission_details')
+                if submission_details:
                     html_content += f"""
-                                <div class="code-section">
-                                    <div class="code-header" onclick="toggleCode('{code_id}')">
-                                        ▶ Generated Solution Code
-                                    </div>
-                                    <div id="{code_id}" class="code-content">{solution_code}</div>
-                                </div>
+                        <div class="submission-section">
+                            <h5>🔍 Submission Details</h5>
+                            <div class="submission-content">
+                                <pre>{json.dumps(submission_details, indent=2)}</pre>
+                            </div>
+                        </div>
                     """
                 
-                html_content += "</td></tr>"
+                html_content += """
+                    </div>
+                """
             
             html_content += """
-                    </table>
                 </div>
             </div>
             """
