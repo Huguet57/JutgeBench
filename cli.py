@@ -233,7 +233,10 @@ def display_benchmark_summary(results: dict):
     table.add_column("Avg Time", justify="right")
     table.add_column("Total Tokens", justify="right")
     
-    for model_name, stats in results['model_stats'].items():
+    # Handle both old and new data structures for backward compatibility
+    model_stats = results.get('model_stats', results.get('summary', {}).get('model_stats', {}))
+    
+    for model_name, stats in model_stats.items():
         success_rate = f"{stats['success_rate']:.1f}%"
         avg_time = f"{stats['avg_time_per_problem']:.2f}s"
         
@@ -249,7 +252,9 @@ def display_benchmark_summary(results: dict):
     
     console.print(table)
     
-    console.print(f"\n[dim]Total benchmark time: {results['benchmark_time']:.2f} seconds[/dim]")
+    # Handle both old and new data structures for backward compatibility
+    benchmark_time = results.get('benchmark_time', results.get('summary', {}).get('benchmark_time', 0))
+    console.print(f"\n[dim]Total benchmark time: {benchmark_time:.2f} seconds[/dim]")
 
 
 def generate_csv_report(results: dict):

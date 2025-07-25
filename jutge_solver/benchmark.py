@@ -395,10 +395,19 @@ class AIModelBenchmark:
         # Generate summary
         summary = self._generate_summary(total_time)
         
+        # Create full results data structure for HTML generation
+        full_results = {
+            "problem_set": problem_set_name,
+            "config": self.benchmark_config.model_dump(),
+            "results": [r.to_dict() for r in self.results],
+            "summary": summary,
+            "benchmark_time": total_time
+        }
+        
         # Save results
         self._save_results(problem_set_name)
         
-        return summary
+        return full_results
     
     def _benchmark_models_parallel(self, models: List[AIModelConfig], problem_ids: List[str]) -> None:
         """Benchmark all models on all problems in parallel"""
