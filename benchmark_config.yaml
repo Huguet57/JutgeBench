@@ -243,6 +243,11 @@ problem_sets:
     - "P92351_en"   # Integer division and remainder of an integer number by a natural number
     - "P98960_en"   # Uppercase and lowercase letters
 
+  custom_problems:
+    - "P98960_en"   # Uppercase and lowercase letters
+    - "P51126_en"   # Intervals (1)
+    - "P90226_en"   # Comparison of words
+
 # Benchmark settings
 max_attempts_per_problem: 1
 timeout_per_problem: 300  # 5 minutes

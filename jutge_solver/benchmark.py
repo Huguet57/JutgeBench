@@ -32,6 +32,7 @@ from jutge_api_client import JutgeApiClient
 from jutge_solver import Config
 from jutge_solver.benchmark_config import BenchmarkConfig, AIModelConfig
 from jutge_solver.problem_analyzer import ProblemAnalyzer
+from jutge_solver.solution_generator import SolutionGenerator
 
 
 class BenchmarkResult:
@@ -73,12 +74,14 @@ class BenchmarkResult:
 
 
 class AIModelAdapter:
-    """Adapter to handle different AI model providers"""
+    """Adapter for different AI model providers"""
     
-    def __init__(self, model_config: AIModelConfig):
-        self.config = model_config
+    def __init__(self, config: AIModelConfig):
+        self.config = config
         self.client = self._create_client()
-        
+        # Create a SolutionGenerator instance for code extraction
+        self.solution_generator = SolutionGenerator(None, None)
+    
     def _create_client(self):
         """Create the appropriate client based on provider"""
         if self.config.provider == "openai":
@@ -114,7 +117,7 @@ class AIModelAdapter:
                 temperature=self.config.temperature,
                 timeout=self.config.timeout
             )
-            solution = response.choices[0].message.content
+            raw_solution = response.choices[0].message.content
             tokens = response.usage.total_tokens
             
         elif self.config.provider == "anthropic":
@@ -125,7 +128,7 @@ class AIModelAdapter:
                 temperature=self.config.temperature,
                 system="You are an expert competitive programmer. Generate only the code solution without any explanation."
             )
-            solution = response.content[0].text
+            raw_solution = response.content[0].text
             tokens = response.usage.input_tokens + response.usage.output_tokens
             
         elif self.config.provider == "google":
@@ -136,14 +139,20 @@ class AIModelAdapter:
                     "max_output_tokens": self.config.max_tokens,
                 }
             )
-            solution = response.text
+            raw_solution = response.text
             tokens = 0  # Google doesn't provide token counts directly
             
         else:
             raise ValueError(f"Unknown provider: {self.config.provider}")
         
+        # Extract clean code from the AI response
+        clean_solution = self.solution_generator._extract_code(raw_solution, language)
+        if not clean_solution:
+            # If extraction fails, fall back to raw solution
+            clean_solution = raw_solution
+        
         generation_time = time.time() - start_time
-        return solution, tokens, generation_time
+        return clean_solution, tokens, generation_time
     
     def _create_prompt(self, problem_data: Dict[str, Any], language: str) -> str:
         """Create prompt for the AI model"""

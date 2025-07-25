@@ -214,11 +214,17 @@ Write your {language_name} solution below:"""
         
         # If that fails, fall back to language-specific extraction
         if compiler_id == "Python3":
-            return self._extract_python_code(response)
+            extracted = self._extract_python_code(response)
+            if extracted:
+                return extracted
         elif compiler_id in ["G++17", "G++"]:
-            return self._extract_cpp_code(response)
+            extracted = self._extract_cpp_code(response)
+            if extracted:
+                return extracted
         elif compiler_id == "JDK":
-            return self._extract_java_code(response)
+            extracted = self._extract_java_code(response)
+            if extracted:
+                return extracted
         
         # Last resort: return the whole response cleaned up
         return self._clean_response(response)
@@ -370,6 +376,11 @@ Write your {language_name} solution below:"""
     
     def _extract_python_code(self, response: str) -> Optional[str]:
         """Extract Python code from response"""
+        # First check if the entire response is already valid Python code
+        if self._is_valid_code(response, "Python3"):
+            return response
+        
+        # Otherwise, try to extract code by looking for code patterns
         lines = response.split('\n')
         code_lines = []
         in_code = False
