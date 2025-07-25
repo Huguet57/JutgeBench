@@ -3,6 +3,7 @@ Solution generation module using OpenAI API
 """
 
 import re
+import base64
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
@@ -116,18 +117,52 @@ class SolutionGenerator:
             }
     
     def _get_problem_statement(self, problem_info: Dict[str, Any]) -> str:
-        """Extract the problem statement from the problem info"""
+        """Extract comprehensive problem information including statement and test cases"""
         try:
             title = problem_info.get("title", "Unknown Problem")
             statement = problem_info.get("statement", "")
+            author = problem_info.get("author", "Unknown Author")
             
-            # If we have the full statement, use it
+            # Build the problem description
+            result = f"Title: {title}\\nAuthor: {author}\\n\\n"
+            
+            # Add the statement
             if statement:
-                return f"Title: {title}\\n\\n{statement}"
-            else:
-                return f"Title: {title}\\n\\nProblem: Please solve this programming problem."
+                result += f"Problem Statement:\\n{statement}\\n\\n"
+            
+            # Add sample test cases if available
+            sample_testcases = problem_info.get("sample_testcases", [])
+            if sample_testcases:
+                result += "Sample Test Cases:\\n"
+                for i, testcase in enumerate(sample_testcases, 1):
+                    try:
+                        input_data = base64.b64decode(testcase.get("input_b64", "")).decode('utf-8')
+                        expected_output = base64.b64decode(testcase.get("correct_b64", "")).decode('utf-8')
+                        result += f"Test Case {i}:\\n"
+                        result += f"Input: {input_data.strip()}\\n"
+                        result += f"Expected Output: {expected_output.strip()}\\n\\n"
+                    except:
+                        continue
+            
+            # Add public test cases if available
+            public_testcases = problem_info.get("public_testcases", [])
+            if public_testcases and len(public_testcases) > len(sample_testcases):
+                result += "Additional Public Test Cases:\\n"
+                for i, testcase in enumerate(public_testcases[len(sample_testcases):], len(sample_testcases) + 1):
+                    try:
+                        input_data = base64.b64decode(testcase.get("input_b64", "")).decode('utf-8')
+                        expected_output = base64.b64decode(testcase.get("correct_b64", "")).decode('utf-8')
+                        result += f"Test Case {i}:\\n"
+                        result += f"Input: {input_data.strip()}\\n"
+                        result += f"Expected Output: {expected_output.strip()}\\n\\n"
+                    except:
+                        continue
+            
+            return result
+            
         except:
-            return "Programming problem to solve"
+            title = problem_info.get("title", "Unknown Problem")
+            return f"Title: {title}\\n\\nProblem: Please solve this programming problem."
     
     def _get_system_prompt(self, compiler_id: str) -> str:
         """Get the system prompt based on the target language"""

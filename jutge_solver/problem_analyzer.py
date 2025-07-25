@@ -28,9 +28,12 @@ class ProblemAnalyzer:
             Dict containing problem analysis results
         """
         try:
-            # Get problem details
-            problem = self.jutge_client.problems.get_problem(problem_id)
-            statement = self.jutge_client.problems.get_text_statement(problem_id)
+            # Get problem details with rich information
+            problem_rich = self.jutge_client.problems.get_problem_rich(problem_id)
+            statement = problem_rich.html_statement
+            
+            # Get public test cases
+            public_testcases = self.jutge_client.problems.get_public_testcases(problem_id)
             
             # Parse the problem statement
             parsed_info = self._parse_problem_statement(statement)
@@ -38,15 +41,18 @@ class ProblemAnalyzer:
             result = {
                 "success": True,
                 "problem_id": problem_id,
-                "title": problem.title,
-                "author": problem.abstract_problem.author,
+                "title": problem_rich.title,
+                "author": problem_rich.abstract_problem.author,
                 "statement": statement,
+                "abstract_problem": problem_rich.abstract_problem,
+                "sample_testcases": problem_rich.sample_testcases,
+                "public_testcases": public_testcases,
                 "parsed_info": parsed_info,
-                "problem": problem,  # Keep the full problem object
+                "problem": problem_rich,  # Keep the full problem object
                 "timestamp": datetime.now().isoformat()
             }
             
-            console.print(f"[green]✓ Problem analyzed: {problem.title}[/green]")
+            console.print(f"[green]✓ Problem analyzed: {problem_rich.title}[/green]")
             return result
             
         except Exception as e:
