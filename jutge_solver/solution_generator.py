@@ -161,7 +161,9 @@ class SolutionGenerator:
             return result
             
         except:
-            title = problem_info.get("title", "Unknown Problem")
+            title = "Unknown Problem"
+            if problem_info and isinstance(problem_info, dict):
+                title = problem_info.get("title", "Unknown Problem")
             return f"Title: {title}\\n\\nProblem: Please solve this programming problem."
     
     def _get_system_prompt(self, compiler_id: str) -> str:
