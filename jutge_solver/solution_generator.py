@@ -239,7 +239,28 @@ Write your {language_name} solution below:"""
             "JDK": ["java", "Java"]
         }
         
-        # Try to extract code from various markdown block formats
+        # First, handle responses with literal \n characters (escaped newlines)
+        # This is common when the API returns JSON-encoded strings
+        if '\\n' in response:
+            # Try to extract code from various markdown block formats with escaped newlines
+            # Pattern 1: Standard markdown with language identifier and escaped newlines
+            for lang in language_patterns.get(compiler_id, []):
+                pattern = rf'```{lang}\\n(.*?)```'
+                matches = re.findall(pattern, response, re.DOTALL | re.IGNORECASE)
+                if matches:
+                    # Replace escaped newlines with actual newlines
+                    code = matches[0].replace('\\n', '\n').strip()
+                    return code
+            
+            # Pattern 2: Generic code blocks without language identifier (escaped newlines)
+            pattern = r'```\\n(.*?)```'
+            matches = re.findall(pattern, response, re.DOTALL)
+            if matches:
+                code = matches[0].replace('\\n', '\n').strip()
+                if self._is_valid_code(code, compiler_id):
+                    return code
+        
+        # Now handle responses with actual newline characters
         # Pattern 1: Standard markdown with language identifier
         for lang in language_patterns.get(compiler_id, []):
             pattern = rf'```{lang}\s*\n(.*?)```'
@@ -266,8 +287,17 @@ Write your {language_name} solution below:"""
                 # Skip if it looks like a language identifier
                 if len(match.strip().split('\n')[0].split()) == 1 and match.strip().split('\n')[0].lower() in ['python', 'cpp', 'java', 'c++']:
                     continue
-                if self._is_valid_code(match.strip(), compiler_id):
-                    return match.strip()
+                # Also check for escaped newlines
+                cleaned_match = match.replace('\\n', '\n').strip()
+                # Skip if the first line is just a language identifier
+                first_line = cleaned_match.split('\n')[0].strip()
+                if first_line.lower() in ['python', 'cpp', 'java', 'c++', 'py', 'python3']:
+                    # Extract everything after the first line
+                    remaining = '\n'.join(cleaned_match.split('\n')[1:]).strip()
+                    if self._is_valid_code(remaining, compiler_id):
+                        return remaining
+                elif self._is_valid_code(cleaned_match, compiler_id):
+                    return cleaned_match
         
         # Pattern 4: Indented code blocks (4 spaces or tab)
         lines = response.split('\n')
@@ -340,7 +370,7 @@ Write your {language_name} solution below:"""
     
     def _extract_python_code(self, response: str) -> Optional[str]:
         """Extract Python code from response"""
-        lines = response.split('\\n')
+        lines = response.split('\n')
         code_lines = []
         in_code = False
         
@@ -357,11 +387,11 @@ Write your {language_name} solution below:"""
             if in_code:
                 code_lines.append(line)
         
-        return '\\n'.join(code_lines).strip() if code_lines else None
+        return '\n'.join(code_lines).strip() if code_lines else None
     
     def _extract_cpp_code(self, response: str) -> Optional[str]:
         """Extract C++ code from response"""
-        lines = response.split('\\n')
+        lines = response.split('\n')
         code_lines = []
         in_code = False
         
@@ -374,11 +404,11 @@ Write your {language_name} solution below:"""
             if in_code:
                 code_lines.append(line)
         
-        return '\\n'.join(code_lines).strip() if code_lines else None
+        return '\n'.join(code_lines).strip() if code_lines else None
     
     def _extract_java_code(self, response: str) -> Optional[str]:
         """Extract Java code from response"""
-        lines = response.split('\\n')
+        lines = response.split('\n')
         code_lines = []
         in_code = False
         
@@ -391,7 +421,7 @@ Write your {language_name} solution below:"""
             if in_code:
                 code_lines.append(line)
         
-        return '\\n'.join(code_lines).strip() if code_lines else None
+        return '\n'.join(code_lines).strip() if code_lines else None
     
     def _clean_response(self, response: str) -> str:
         """Clean up the response as a last resort"""
