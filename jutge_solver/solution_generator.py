@@ -136,8 +136,8 @@ class SolutionGenerator:
 
 IMPORTANT REQUIREMENTS:
 - Write ONLY the solution code, no explanations or comments
-- DO NOT use markdown code blocks (```python, ```cpp, ```java, etc.)
-- Output the raw code directly without any formatting or backticks
+- Output the raw code directly - DO NOT wrap in markdown blocks (no ```)
+- If you must use formatting, we will extract the code, but raw code is strongly preferred
 - Ensure the code handles all input/output exactly as specified
 - Use efficient algorithms appropriate for competitive programming
 - Make sure to handle edge cases and constraints"""
@@ -184,14 +184,13 @@ JAVA SPECIFIC:
 
 Requirements:
 - Provide only the complete, runnable code
-- DO NOT wrap the code in markdown blocks (```python, ```cpp, ```java, etc.)
-- Output the raw code directly without backticks or formatting
-- No explanations, comments, or markdown formatting
+- Output raw code directly (no markdown formatting, no ```)
+- No explanations, comments, or text before/after the code
 - Handle input/output exactly as specified in the problem
 - Ensure the solution is efficient and handles edge cases
 - Code should be ready to submit to an online judge
 
-{language_name} solution:"""
+Write your {language_name} solution below:"""
 
         return prompt
     
@@ -208,21 +207,12 @@ Requirements:
     def _extract_code(self, response: str, compiler_id: str) -> Optional[str]:
         """Extract code from OpenAI response"""
         
-        # Try to find code blocks first
-        code_block_patterns = [
-            r'```(?:python|py)\\n(.*?)```',
-            r'```(?:cpp|c\\+\\+)\\n(.*?)```',
-            r'```(?:java)\\n(.*?)```',
-            r'```\\n(.*?)```',
-            r'```(.*?)```'
-        ]
+        # First, try the comprehensive cleaning approach
+        cleaned_code = self._clean_code_blocks(response, compiler_id)
+        if cleaned_code:
+            return cleaned_code
         
-        for pattern in code_block_patterns:
-            matches = re.findall(pattern, response, re.DOTALL | re.IGNORECASE)
-            if matches:
-                return matches[0].strip()
-        
-        # If no code blocks found, try to extract based on language patterns
+        # If that fails, fall back to language-specific extraction
         if compiler_id == "Python3":
             return self._extract_python_code(response)
         elif compiler_id in ["G++17", "G++"]:
@@ -232,6 +222,121 @@ Requirements:
         
         # Last resort: return the whole response cleaned up
         return self._clean_response(response)
+    
+    def _clean_code_blocks(self, response: str, compiler_id: str) -> Optional[str]:
+        """
+        Comprehensive cleaning of code blocks from AI responses
+        Handles various markdown formats and edge cases
+        """
+        # Remove leading/trailing whitespace
+        response = response.strip()
+        
+        # Common language identifiers in code blocks
+        language_patterns = {
+            "Python3": ["python", "py", "python3"],
+            "G++17": ["cpp", "c\\+\\+", "C\\+\\+", "cc", "cxx"],
+            "G++": ["cpp", "c\\+\\+", "C\\+\\+", "cc", "cxx"],
+            "JDK": ["java", "Java"]
+        }
+        
+        # Try to extract code from various markdown block formats
+        # Pattern 1: Standard markdown with language identifier
+        for lang in language_patterns.get(compiler_id, []):
+            pattern = rf'```{lang}\s*\n(.*?)```'
+            matches = re.findall(pattern, response, re.DOTALL | re.IGNORECASE)
+            if matches:
+                return matches[0].strip()
+        
+        # Pattern 2: Generic code blocks without language identifier
+        pattern = r'```\s*\n(.*?)```'
+        matches = re.findall(pattern, response, re.DOTALL)
+        if matches:
+            # If multiple blocks, try to find the main one
+            for match in matches:
+                if self._is_valid_code(match.strip(), compiler_id):
+                    return match.strip()
+            # If no valid code found, return the first block
+            return matches[0].strip()
+        
+        # Pattern 3: Code blocks with just triple backticks (no newline)
+        pattern = r'```(.*?)```'
+        matches = re.findall(pattern, response, re.DOTALL)
+        if matches:
+            for match in matches:
+                # Skip if it looks like a language identifier
+                if len(match.strip().split('\n')[0].split()) == 1 and match.strip().split('\n')[0].lower() in ['python', 'cpp', 'java', 'c++']:
+                    continue
+                if self._is_valid_code(match.strip(), compiler_id):
+                    return match.strip()
+        
+        # Pattern 4: Indented code blocks (4 spaces or tab)
+        lines = response.split('\n')
+        code_lines = []
+        in_code_block = False
+        
+        for line in lines:
+            # Check if line is indented (code block)
+            if line.startswith('    ') or line.startswith('\t'):
+                in_code_block = True
+                # Remove the indentation
+                code_lines.append(line[4:] if line.startswith('    ') else line[1:])
+            elif in_code_block and line.strip() == '':
+                # Empty line in code block
+                code_lines.append('')
+            elif in_code_block and not line.startswith((' ', '\t')):
+                # End of code block
+                break
+        
+        if code_lines:
+            code = '\n'.join(code_lines).strip()
+            if self._is_valid_code(code, compiler_id):
+                return code
+        
+        # Pattern 5: Look for code between explanation text
+        # Remove common explanation phrases and try to extract code
+        explanation_patterns = [
+            r'^.*?[Hh]ere\'s?\s+(?:the|a|my)\s+(?:solution|code|implementation).*?:?\s*\n',
+            r'^.*?[Ss]olution.*?:?\s*\n',
+            r'^.*?[Cc]ode.*?:?\s*\n',
+            r'^.*?[Ii]mplementation.*?:?\s*\n',
+            r'\n\s*(?:Explanation|Note|Output|This).*$'
+        ]
+        
+        cleaned_response = response
+        for pattern in explanation_patterns:
+            cleaned_response = re.sub(pattern, '', cleaned_response, flags=re.MULTILINE | re.DOTALL)
+        
+        cleaned_response = cleaned_response.strip()
+        if cleaned_response and self._is_valid_code(cleaned_response, compiler_id):
+            return cleaned_response
+        
+        return None
+    
+    def _is_valid_code(self, code: str, compiler_id: str) -> bool:
+        """
+        Check if the extracted text is likely valid code for the given language
+        """
+        if not code or len(code.strip()) < 10:
+            return False
+        
+        # Language-specific validation
+        if compiler_id == "Python3":
+            # Check for Python keywords or patterns
+            python_indicators = ['def ', 'import ', 'print(', 'input(', 'for ', 'while ', 'if ', '=', ':']
+            return any(indicator in code for indicator in python_indicators)
+        
+        elif compiler_id in ["G++17", "G++"]:
+            # Check for C++ keywords or patterns
+            cpp_indicators = ['#include', 'int main', 'using namespace', 'cin', 'cout', '{', '}', ';']
+            return any(indicator in code for indicator in cpp_indicators)
+        
+        elif compiler_id == "JDK":
+            # Check for Java keywords or patterns
+            java_indicators = ['public class', 'class Main', 'public static void main', 'import java', 'System.out', '{', '}', ';']
+            return any(indicator in code for indicator in java_indicators)
+        
+        # If language not recognized, accept if it looks like code
+        return True
     
     def _extract_python_code(self, response: str) -> Optional[str]:
         """Extract Python code from response"""
