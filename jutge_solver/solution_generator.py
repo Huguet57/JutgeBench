@@ -245,7 +245,8 @@ PYTHON SPECIFIC:
 - CRITICAL: NEVER use 'return' statements outside of functions - this causes SyntaxError
 - Write main execution code at the top level, not inside functions unless specifically needed
 - If you must use functions, ensure all code paths are properly structured
-- IMPORTANT: If using early exit logic, use sys.exit() or conditional blocks, NOT return
+- IMPORTANT: For early exit logic, use conditional blocks (if/elif/else) or organize code in functions
+- Use proper control flow with if/elif/else statements for different cases
 """
         elif compiler_id in ["G++17", "G++"]:
             return base_prompt + """
@@ -340,8 +341,9 @@ Target language: {language_name}"""
 
 IMPORTANT PYTHON CONSTRAINTS:
 - NEVER use 'return' statements outside of functions - this causes SyntaxError
-- If you need early exit logic, use sys.exit() or conditional blocks instead
-- Write main execution code at the top level, not inside functions unless necessary"""
+- For early exit logic, use conditional blocks (if/elif/else) or organize code properly in functions
+- Write main execution code at the top level, not inside functions unless necessary
+- Use proper control flow with if/elif/else statements for different cases"""
         
         return base_step1_prompt
 
@@ -370,9 +372,10 @@ PYTHON SPECIFIC:
 - Print output using print() function
 - Match output format exactly as specified in the problem
 - CRITICAL: NEVER use 'return' statements outside of functions - this causes SyntaxError
-- If the previous response has 'return' outside functions, REMOVE it or replace with proper logic
+- If the previous response has 'return' outside functions, REMOVE it and use conditional blocks instead
 - Write main execution code at the top level
-- Use sys.exit() or conditional blocks for early exit, NOT return"""
+- Use if/elif/else conditional blocks or organize code in functions for control flow, NOT return
+- Restructure logic with proper conditional statements (if/elif/else)"""
 
         elif compiler_id in ["G++17", "G++"]:
             return base_prompt + """
