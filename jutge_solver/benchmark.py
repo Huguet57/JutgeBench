@@ -159,7 +159,35 @@ class AIModelAdapter:
     
     def _create_prompt(self, problem_data: Dict[str, Any], language: str) -> str:
         """Create prompt for the AI model"""
-        return f"""Solve this programming problem in {language}:
+        if language == "G++17":
+            # C++ specific prompt
+            return f"""Please solve the following competitive programming problem in C++.
+Your solution should be a single, complete, and runnable C++ program.
+It must include all necessary headers, such as `<iostream>`, and be wrapped in a `main` function.
+Do not use any external libraries or platform-specific features.
+Focus on correctness and efficiency.
+
+**Problem Details:**
+
+**Title:** {problem_data.get('title', 'Unknown')}
+
+**Statement:**
+{problem_data.get('statement', '')}
+
+**Input:**
+{problem_data.get('input', '')}
+
+**Output:**
+{problem_data.get('output', '')}
+
+**Sample Inputs and Outputs:**
+{self._format_samples(problem_data.get('samples', []))}
+
+Your final output should be only the C++ code, with no additional explanations or markdown.
+"""
+        else:
+            # Default prompt for other languages
+            return f"""Solve this programming problem in {language}:
 
 Title: {problem_data.get('title', 'Unknown')}
 
@@ -193,7 +221,7 @@ Generate only the code solution without any explanation or markdown formatting.
 
 
 def benchmark_single_problem(model_config: AIModelConfig, problem_id: str, jutge_config: Config, 
-                            max_attempts: int, logger_name: str, raw_logging_config: Dict[str, Any] = None) -> BenchmarkResult:
+                            max_attempts: int, logger_name: str, language: str = "Python3", raw_logging_config: Dict[str, Any] = None) -> BenchmarkResult:
     """Benchmark a single problem with a single model - designed for parallel execution"""
     # Create fresh instances for this worker
     jutge_client = JutgeApiClient()
@@ -238,7 +266,7 @@ def benchmark_single_problem(model_config: AIModelConfig, problem_id: str, jutge
             try:
                 # Generate solution using SolutionGenerator (with raw response logging)
                 start_time = time.time()
-                generation_result = solution_generator.generate_solution(problem_data, "Python3", attempt + 1)
+                generation_result = solution_generator.generate_solution(problem_data, language, attempt + 1)
                 gen_time = time.time() - start_time
                 
                 if not generation_result.get("success"):
@@ -247,7 +275,7 @@ def benchmark_single_problem(model_config: AIModelConfig, problem_id: str, jutge
                 result.solution_code = generation_result["code"]
                 result.tokens_used = generation_result["token_usage"]["total_tokens"]
                 result.generation_time = gen_time
-                result.language = "Python3"
+                result.language = language
                 
                 # Submit solution with retry logic for server errors
                 submission_start = time.time()
@@ -258,7 +286,7 @@ def benchmark_single_problem(model_config: AIModelConfig, problem_id: str, jutge
                     try:
                         submission_id = jutge_client.student.submissions.submit(
                             problem_id, 
-                            "Python3",
+                            language,
                             result.solution_code,
                             f"Benchmark test by {model_config.name}"
                         )
@@ -387,7 +415,7 @@ class AIModelBenchmark:
         logger.setLevel(logging.INFO)
         return logger
         
-    def run_benchmark(self, problem_set_name: str) -> Dict[str, Any]:
+    def run_benchmark(self, problem_set_name: str, language: str = "Python3") -> Dict[str, Any]:
         """Run benchmark for a specific problem set"""
         problem_ids = self.benchmark_config.problem_sets.get(problem_set_name, [])
         if not problem_ids:
@@ -400,6 +428,7 @@ class AIModelBenchmark:
         self.logger.info(f"Starting benchmark for problem set: {problem_set_name}")
         self.logger.info(f"Problems: {problem_ids}")
         self.logger.info(f"Models: {[m.name for m in models]}")
+        self.logger.info(f"Language: {language}")
         
         start_time = time.time()
         
@@ -408,13 +437,13 @@ class AIModelBenchmark:
         # Run benchmarks in parallel
         self.logger.info(f"Running benchmarks with {self.max_workers} workers using {'processes' if self.use_processes else 'threads'}")
         if self.benchmark_config.parallel_strategy == "full":
-            self._benchmark_models_parallel(models, problem_ids)
+            self._benchmark_models_parallel(models, problem_ids, language)
         elif self.benchmark_config.parallel_strategy == "models":
-            self._benchmark_models_sequential_problems_parallel(models, problem_ids)
+            self._benchmark_models_sequential_problems_parallel(models, problem_ids, language)
         else:  # sequential fallback
             for model_config in models:
                 self.logger.info(f"Benchmarking model: {model_config.name}")
-                self._benchmark_model(model_config, problem_ids)
+                self._benchmark_model(model_config, problem_ids, language)
         
         total_time = time.time() - start_time
         
@@ -435,7 +464,7 @@ class AIModelBenchmark:
         
         return full_results
     
-    def _benchmark_models_parallel(self, models: List[AIModelConfig], problem_ids: List[str]) -> None:
+    def _benchmark_models_parallel(self, models: List[AIModelConfig], problem_ids: List[str], language: str) -> None:
         """Benchmark all models on all problems in parallel"""
         # Create all (model, problem) pairs
         tasks = []
@@ -466,6 +495,7 @@ class AIModelBenchmark:
                     self.jutge_config,
                     self.benchmark_config.max_attempts_per_problem,
                     f"benchmark.{model_config.name}",
+                    language,
                     raw_logging_config
                 )
                 future_to_task[future] = (model_config.name, problem_id)
@@ -485,13 +515,13 @@ class AIModelBenchmark:
                     error_result.verdict = "ERROR"
                     self.results.append(error_result)
     
-    def _benchmark_models_sequential_problems_parallel(self, models: List[AIModelConfig], problem_ids: List[str]) -> None:
+    def _benchmark_models_sequential_problems_parallel(self, models: List[AIModelConfig], problem_ids: List[str], language: str) -> None:
         """Benchmark models sequentially, but problems within each model in parallel"""
         for model_config in models:
             self.logger.info(f"Benchmarking model: {model_config.name}")
-            self._benchmark_model_parallel(model_config, problem_ids)
+            self._benchmark_model_parallel(model_config, problem_ids, language)
     
-    def _benchmark_model_parallel(self, model_config: AIModelConfig, problem_ids: List[str]) -> None:
+    def _benchmark_model_parallel(self, model_config: AIModelConfig, problem_ids: List[str], language: str) -> None:
         """Benchmark a single model on all problems in parallel"""
         executor_class = ProcessPoolExecutor if self.use_processes else ThreadPoolExecutor
         
@@ -513,6 +543,7 @@ class AIModelBenchmark:
                     self.jutge_config,
                     self.benchmark_config.max_attempts_per_problem,
                     f"benchmark.{model_config.name}",
+                    language,
                     raw_logging_config
                 )
                 future_to_problem[future] = problem_id
@@ -532,7 +563,7 @@ class AIModelBenchmark:
                     error_result.verdict = "ERROR"
                     self.results.append(error_result)
     
-    def _benchmark_model(self, model_config: AIModelConfig, problem_ids: List[str]) -> None:
+    def _benchmark_model(self, model_config: AIModelConfig, problem_ids: List[str], language: str) -> None:
         """Benchmark a single model on all problems"""
         adapter = AIModelAdapter(model_config)
         
@@ -554,17 +585,17 @@ class AIModelBenchmark:
                     
                     try:
                         # Generate solution
-                        solution, tokens, gen_time = adapter.generate_solution(problem_data, "Python3")
+                        solution, tokens, gen_time = adapter.generate_solution(problem_data, language)
                         result.solution_code = solution
                         result.tokens_used = tokens
                         result.generation_time = gen_time
-                        result.language = "Python3"
+                        result.language = language
                         
                         # Submit solution
                         submission_start = time.time()
                         submission_id = self.jutge_client.student.submissions.submit(
                             problem_id, 
-                            "Python3",
+                            language,
                             solution,
                             f"Benchmark test by {model_config.name}"
                         )

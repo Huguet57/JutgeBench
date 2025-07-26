@@ -63,6 +63,7 @@ Examples:
     benchmark_parser.add_argument('--config', help='Benchmark config file path')
     benchmark_parser.add_argument('--report', '-r', choices=['json', 'csv', 'html'], default='json', help='Report format')
     benchmark_parser.add_argument('--parallel', '-p', action='store_true', help='Run models in parallel')
+    benchmark_parser.add_argument('--language', '-l', default=None, help='Programming language to use for solutions (e.g., Python3, G++17). If not specified, uses default_language from config.')
     
     args = parser.parse_args()
     
@@ -200,9 +201,12 @@ def handle_benchmark_command(args):
     )
     
     try:
+        # Use default language from config if not specified
+        language = args.language or benchmark_config.default_language
+        
         # Run benchmark
         console.print(f"\n[blue]Running benchmark on '{args.problem_set}' problem set[/blue]")
-        results = benchmark.run_benchmark(args.problem_set)
+        results = benchmark.run_benchmark(args.problem_set, language)
         
         # Display summary
         display_benchmark_summary(results)
@@ -1033,16 +1037,22 @@ def generate_html_report(results: dict):
                 """
                 
                 # Solution code section - make it prominent
-                if solution_code:
+                # Check for solution_code first, then fall back to code field (for Format Error cases)
+                code_to_display = solution_code or result.get('code', '')
+                if code_to_display:
                     code_id = f"{model_id}{problem_id}code".replace('_', '').replace('-', '')
+                    # Add a note if this code failed due to format issues
+                    code_header = "💡 Generated Solution"
+                    if not solution_code and result.get('error') == 'Format Error':
+                        code_header = "⚠️ Generated Code (Format Error)"
                     html_content += f"""
                         <div class="solution-section">
                             <div class="solution-header">
-                                <h5>💡 Generated Solution</h5>
+                                <h5>{code_header}</h5>
                                 <button class="copy-btn" onclick="copyCode('{code_id}')">📋 Copy</button>
                             </div>
                             <div class="solution-code" id="{code_id}">
-                                <pre><code>{solution_code}</code></pre>
+                                <pre><code>{code_to_display}</code></pre>
                             </div>
                         </div>
                     """

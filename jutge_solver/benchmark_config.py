@@ -26,6 +26,7 @@ class BenchmarkConfig(BaseModel):
     """Configuration for AI model benchmarks"""
     models: List[AIModelConfig] = Field(default_factory=list)
     problem_sets: Dict[str, List[str]] = Field(default_factory=dict)
+    default_language: str = "Python3"  # Default programming language for benchmarks
     max_attempts_per_problem: int = 1
     timeout_per_problem: int = 300  # 5 minutes
     retry_on_failure: bool = True

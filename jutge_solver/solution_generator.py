@@ -114,6 +114,24 @@ class SolutionGenerator:
                 if not code:
                     extraction_failed = True
                     raise ValueError("No code found in Step 2 response")
+                
+                # For C++ code, validate template compliance
+                if compiler_id in ["G++17", "G++"] and not self._validate_cpp_template(code):
+                    console.print("[red]  ✗ Generation failed: Generated C++ code does not follow required template structure[/red]")
+                    logger.warning(f"Template validation failed (attempt {attempt}): Generated C++ code does not follow required template structure")
+                    self._save_raw_response_on_failure(final_raw_response, problem_info, compiler_id, attempt, "template_validation_failed", "Generated C++ code does not follow required template structure")
+                    
+                    return {
+                        "success": False,
+                        "error": "Format Error",
+                        "error_details": "Generated C++ code does not follow required template structure",
+                        "compiler_id": compiler_id,
+                        "attempt": attempt,
+                        "timestamp": datetime.now().isoformat(),
+                        "error_type": "template_validation_failed",
+                        "code": code  # Include the code for debugging
+                    }
+                    
             except Exception as e:
                 extraction_failed = True
                 self._save_raw_response_on_failure(final_raw_response, problem_info, compiler_id, attempt, "extraction_failed", str(e))
@@ -281,35 +299,105 @@ CRITICAL: If you don't include BOTH input reading AND print statements, your sol
 C++ SPECIFIC REQUIREMENTS:
 - Use standard competitive programming includes: #include <iostream> and others as needed
 - MANDATORY: Include proper main() function
-- MANDATORY: Read input using std::cin, scanf, or similar - NEVER assume variables exist
+- MANDATORY: Read input using std::cin, getline, scanf, or similar - NEVER assume variables exist
 - MANDATORY: Print output using std::cout, printf, or similar - match format exactly as shown in Expected Output
+- MANDATORY: Use the EXACT template structure shown below - DO NOT deviate from this format
 - Pay attention to spacing and separators: cout << a << " " << b for space-separated vs cout << "(" << a << "," << b << "," << c << ")" for parentheses format
 
 🚨 C++ COMPLETENESS CHECKLIST:
 ✅ #include <iostream> (and other necessary headers)
-✅ int main() function definition
-✅ Input reading inside main (cin >> variables)
+✅ using namespace std; statement
+✅ int main() function definition 
+✅ Input reading inside main (cin >> variables or getline)
 ✅ Algorithm implementation
 ✅ Output printing (cout << result)
 ✅ return 0; statement
 
-COMPLETE C++ TEMPLATE PATTERN:
+🚨 MANDATORY C++ TEMPLATE - USE EXACTLY THIS STRUCTURE:
 #include <iostream>
 using namespace std;
 
 int main() {
     // Read input
-    int a, b; // or appropriate variable types
-    cin >> a >> b; // or appropriate input reading
+    [INSERT YOUR VARIABLE DECLARATIONS HERE]
+    [INSERT YOUR INPUT READING HERE]
     
-    // Process
-    int result = a + b; // your algorithm here
+    // Process/Algorithm
+    [INSERT YOUR ALGORITHM HERE]
     
     // Print output
-    cout << result << endl; // or appropriate output format
+    [INSERT YOUR OUTPUT PRINTING HERE]
     
     return 0;
 }
+
+📚 TEMPLATE EXAMPLES - Study these patterns:
+
+Example 1 - Sum of two integers:
+```cpp
+#include <iostream>
+using namespace std;
+
+int main() {
+    // Read input
+    int a, b;
+    cin >> a >> b;
+    
+    // Process/Algorithm
+    int sum = a + b;
+    
+    // Print output
+    cout << sum << endl;
+    
+    return 0;
+}
+```
+
+Example 2 - String processing:
+```cpp
+#include <iostream>
+using namespace std;
+
+int main() {
+    // Read input
+    string text;
+    cin >> text;
+    
+    // Process/Algorithm
+    string result = "";
+    for (char c : text) {
+        result += (char)tolower(c);
+    }
+    
+    // Print output
+    cout << result << endl;
+    
+    return 0;
+}
+```
+
+Example 3 - Multiple test cases:
+```cpp
+#include <iostream>
+using namespace std;
+
+int main() {
+    // Read input
+    int n;
+    cin >> n;
+    
+    // Process/Algorithm
+    for (int i = 0; i < n; i++) {
+        int x;
+        cin >> x;
+        cout << x * 2 << endl;
+    }
+    
+    return 0;
+}
+```
+
+⚠️ CRITICAL: Your code MUST follow this exact template structure. Replace the bracketed sections with your specific implementation, but keep the overall structure identical.
 """
 
         elif compiler_id == "JDK":
@@ -354,58 +442,78 @@ public class Main {
         else:
             return base_prompt
     
-    def _create_prompt(self, problem_statement: str, compiler_id: str) -> str:
-        """Create a detailed prompt for the specific problem and language"""
+    def _create_prompt(self, problem_data: Dict[str, Any], language: str) -> str:
+        """Create prompt for the AI model"""
+        if language == "G++17":
+            # C++ specific prompt
+            return f"""Please solve the following competitive programming problem in C++.
+Your solution should be a single, complete, and runnable C++ program.
+It must include all necessary headers, such as `<iostream>`, and be wrapped in a `main` function.
+Do not use any external libraries or platform-specific features.
+Focus on correctness and efficiency.
+
+**Problem Details:**
+
+**Title:** {problem_data.get('title', 'Unknown')}
+
+**Statement:**
+{problem_data.get('statement', '')}
+
+**Input:**
+{problem_data.get('input', '')}
+
+**Output:**
+{problem_data.get('output', '')}
+
+**Sample Inputs and Outputs:**
+{self._format_samples(problem_data.get('samples', []))}
+
+Your final output should be only the C++ code, with no additional explanations or markdown.
+"""
+        else:
+            # Default prompt for other languages
+            return f"""Solve this programming problem in {language}:
+
+Title: {problem_data.get('title', 'Unknown')}
+
+Statement:
+{problem_data.get('statement', '')}
+
+Input:
+{problem_data.get('input', '')}
+
+Output:
+{problem_data.get('output', '')}
+
+Sample Inputs and Outputs:
+{self._format_samples(problem_data.get('samples', []))}
+
+Generate only the code solution without any explanation or markdown formatting.
+"""
+    
+    def _format_samples(self, samples: List[Dict[str, str]]) -> str:
+        """Format sample inputs and outputs"""
+        if not samples:
+            return "No samples provided"
         
-        language_name = self._get_language_name(compiler_id)
+        formatted = []
+        for i, sample in enumerate(samples, 1):
+            formatted.append(f"Sample {i}:")
+            formatted.append(f"Input:\n{sample.get('input', '')}")
+            formatted.append(f"Output:\n{sample.get('output', '')}\n")
         
-        prompt = f"""Solve this competitive programming problem in {language_name}:
-
-{problem_statement}
-
-🚨 CRITICAL COMPLETENESS REQUIREMENTS:
-Your solution must be a COMPLETE, RUNNABLE program that includes:
-1. ✅ INPUT READING: Read all required input using appropriate methods
-2. ✅ ALGORITHM: Implement the complete solution logic
-3. ✅ OUTPUT PRINTING: Print the result in the exact required format
-
-CRITICAL OUTPUT FORMAT Requirements:
-- Your output must match the expected output format EXACTLY - character by character
-- Pay close attention to the "Expected Output" examples in the test cases above
-- Match spacing, punctuation, parentheses, commas, and separators exactly as shown
-- For example: if expected output shows "2 3 1", output exactly "2 3 1" (NOT "(2,3,1)" or "2,3,1")
-- If expected output shows "(2,3,1)", output exactly "(2,3,1)" (NOT "2 3 1" or "2,3,1")
-- Even a single character difference will cause your solution to be marked as WRONG
-- The sample and public test cases show the EXACT format required
-
-🔍 MANDATORY VERIFICATION CHECKLIST:
-Before submitting, verify your code has:
-✅ Input reading mechanism (never assume variables exist)
-✅ Complete algorithm implementation
-✅ Output printing mechanism (never leave results unprinted)
-✅ Exact output format matching the examples
-
-Code Requirements:
-- Provide only the complete, runnable code
-- Output raw code directly (no markdown formatting, no ```)
-- No explanations, comments, or text before/after the code
-- Handle input/output exactly as specified in the problem
-- Ensure the solution is efficient and handles edge cases
-- Code should be ready to submit to an online judge
-
-Write your complete {language_name} solution below:"""
-
-        return prompt
+        return "\n".join(formatted)
     
     def _get_language_name(self, compiler_id: str) -> str:
-        """Get human-readable language name"""
-        mapping = {
-            "Python3": "Python",
-            "G++17": "C++",
-            "G++": "C++",
-            "JDK": "Java"
-        }
-        return mapping.get(compiler_id, compiler_id)
+        """Get language name from compiler ID"""
+        if "python" in compiler_id.lower():
+            return "Python"
+        elif "cpp" in compiler_id.lower() or "g++" in compiler_id.lower():
+            return "C++"
+        elif "java" in compiler_id.lower() or "jdk" in compiler_id.lower():
+            return "Java"
+        else:
+            return compiler_id
     
     def _get_step1_system_prompt(self, compiler_id: str) -> str:
         """Get the system prompt for step 1: thinking and initial code generation"""
@@ -581,12 +689,74 @@ C++ SPECIFIC:
 - Include proper main() function
 - Use std::cin/cout for input/output
 - Match output format exactly as specified
+- MANDATORY: Use the exact template structure specified
+
+🚨 MANDATORY TEMPLATE ENFORCEMENT:
+Your output code MUST follow this EXACT structure:
+
+#include <iostream>
+using namespace std;
+
+int main() {
+    // Read input
+    [variable declarations and input reading]
+    
+    // Process/Algorithm
+    [your algorithm implementation]
+    
+    // Print output
+    [output printing statements]
+    
+    return 0;
+}
+
+📚 CORRECT TEMPLATE EXAMPLES:
+
+Example 1:
+#include <iostream>
+using namespace std;
+
+int main() {
+    // Read input
+    int a, b;
+    cin >> a >> b;
+    
+    // Process/Algorithm
+    int result = a + b;
+    
+    // Print output
+    cout << result << endl;
+    
+    return 0;
+}
+
+Example 2:
+#include <iostream>
+using namespace std;
+
+int main() {
+    // Read input
+    string s;
+    cin >> s;
+    
+    // Process/Algorithm
+    string reversed = "";
+    for (int i = s.length() - 1; i >= 0; i--) {
+        reversed += s[i];
+    }
+    
+    // Print output
+    cout << reversed << endl;
+    
+    return 0;
+}
 
 🚨 MANDATORY COMPLETENESS VERIFICATION:
 If step 1 response is missing critical components, ADD THEM:
 
+Missing template structure? REFORMAT to match the exact template above
 Missing input reading? ADD:
-- cin >> variable; statements
+- cin >> variable; or getline(cin, variable); statements inside main()
 - Proper variable declarations
 
 Missing output printing? ADD:  
@@ -595,11 +765,13 @@ Missing output printing? ADD:
 
 🔍 FINAL VERIFICATION - Your output code MUST have:
 ✅ #include <iostream> and necessary headers
-✅ int main() function
-✅ Input reading with cin
-✅ Algorithm implementation
-✅ Output printing with cout
-✅ return 0; statement"""
+✅ using namespace std; statement
+✅ int main() function (EXACTLY as shown)
+✅ Input reading with cin inside main
+✅ Algorithm implementation inside main
+✅ Output printing with cout inside main
+✅ return 0; statement
+✅ EXACT template structure as specified above"""
 
         elif compiler_id == "JDK":
             return base_prompt + """
@@ -759,7 +931,7 @@ Output ONLY the clean, executable {language_name} code with no explanations, com
             input_patterns = ['input()', 'input().split()', 'map(int, input().split())', 'int(input())']
             input_found = any(pattern in step1_response for pattern in input_patterns)
         elif compiler_id in ["G++17", "G++"]:
-            input_patterns = ['cin >>', 'scanf(', 'getline(']
+            input_patterns = ['cin >>', 'scanf(', 'getline(', 'getline (']
             input_found = any(pattern in step1_response for pattern in input_patterns)
         elif compiler_id == "JDK":
             input_patterns = ['Scanner', 'nextInt()', 'nextLine()', 'BufferedReader']
@@ -809,7 +981,7 @@ Output ONLY the clean, executable {language_name} code with no explanations, com
             if compiler_id == "Python3":
                 issue_description += "   MUST ADD: input(), input().split(), map(int, input().split()), etc.\n"
             elif compiler_id in ["G++17", "G++"]:
-                issue_description += "   MUST ADD: cin >> variable; statements\n"
+                issue_description += "   MUST ADD: cin >> variable; or getline(cin, variable); statements\n"
             elif compiler_id == "JDK":
                 issue_description += "   MUST ADD: Scanner scanner = new Scanner(System.in); and reading methods\n"
             issue_description += "\n"
@@ -1147,8 +1319,102 @@ Output ONLY the clean, executable {language_name} code with no explanations, com
         
         return '\n'.join(code_examples) if code_examples else "# Match the exact format shown above"
     
+    def _validate_cpp_template(self, code: str) -> bool:
+        """
+        Validate that C++ code follows the required template structure:
+        #include <iostream>
+        using namespace std;
+        int main() { ... return 0; }
+        """
+        if not code or not isinstance(code, str):
+            console.print("[red]  ✗ Template validation failed: Code is empty or invalid[/red]")
+            return False
+        
+        # Normalize whitespace for easier pattern matching
+        normalized_code = ' '.join(code.split())
+        lines = [line.strip() for line in code.split('\n') if line.strip()]
+        
+        template_issues = []
+        
+        # Check for required includes
+        if '#include <iostream>' not in code and '#include<iostream>' not in normalized_code:
+            template_issues.append("Missing required '#include <iostream>'")
+        
+        # Check for using namespace std
+        if 'using namespace std;' not in code and 'using namespace std ;' not in normalized_code:
+            template_issues.append("Missing required 'using namespace std;'")
+        
+        # Check for main function
+        main_found = False
+        for pattern in ['int main()', 'int main( )', 'int main ( )', 'int main(void)', 'int main( void )']:
+            if pattern in normalized_code:
+                main_found = True
+                break
+        
+        if not main_found:
+            template_issues.append("Missing required 'int main()' function")
+        
+        # Check for return 0
+        if 'return 0;' not in code and 'return 0 ;' not in normalized_code:
+            template_issues.append("Missing required 'return 0;' statement")
+        
+        # Check for basic input/output patterns (cin/cout/getline)
+        has_input = any(pattern in code for pattern in ['cin >>', 'cin>>', 'std::cin >>', 'std::cin>>', 'getline(', 'getline ('])
+        has_output = any(pattern in code for pattern in ['cout <<', 'cout<<', 'std::cout <<', 'std::cout<<'])
+        
+        if not has_input:
+            template_issues.append("Missing input reading with cin")
+        
+        if not has_output:
+            template_issues.append("Missing output printing with cout")
+        
+        # Check overall structure order
+        structure_valid = True
+        include_pos = -1
+        using_pos = -1
+        main_pos = -1
+        
+        for i, line in enumerate(lines):
+            if '#include' in line and 'iostream' in line:
+                include_pos = i
+            elif 'using namespace std' in line:
+                using_pos = i
+            elif 'int main(' in line:
+                main_pos = i
+        
+        if include_pos >= 0 and using_pos >= 0 and include_pos > using_pos:
+            structure_valid = False
+            template_issues.append("Template structure error: #include should come before using namespace")
+        
+        if using_pos >= 0 and main_pos >= 0 and using_pos > main_pos:
+            structure_valid = False
+            template_issues.append("Template structure error: using namespace should come before main function")
+        
+        if template_issues:
+            console.print(f"[red]  ✗ C++ Template validation failed:[/red]")
+            for issue in template_issues:
+                console.print(f"[red]    • {issue}[/red]")
+            return False
+        
+        console.print("[green]  ✓ C++ Template validation passed[/green]")
+        return True
+    
     def _extract_code(self, response: str, compiler_id: str) -> Optional[str]:
         """Extract code from OpenAI response"""
+        
+        # For C++, first check if this looks like raw C++ code (no markdown)
+        # If so, use the specific extractor to avoid issues with _clean_code_blocks
+        if compiler_id in ["G++17", "G++"]:
+            # Check if response looks like raw C++ code
+            response_lower = response.lower().strip()
+            if (response_lower.startswith('#include') and 
+                'using namespace std' in response and 
+                'int main(' in response and
+                '```' not in response):  # No markdown blocks
+                # This looks like raw C++ code, use specific extractor
+                extracted = self._extract_cpp_code(response)
+                if extracted:
+                    return extracted
         
         # First, try the comprehensive cleaning approach
         cleaned_code = self._clean_code_blocks(response, compiler_id)
