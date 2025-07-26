@@ -44,7 +44,7 @@ class SolutionGenerator:
     
     def generate_solution(self, problem_info: Dict[str, Any], compiler_id: str, attempt: int = 1) -> Dict[str, Any]:
         """
-        Generate a solution for the given problem
+        Generate a solution for the given problem using a two-step process
         
         Args:
             problem_info: Problem information from problem analyzer
@@ -55,25 +55,25 @@ class SolutionGenerator:
             Dict containing generation results
         """
         try:
-            console.print(f"[blue]  Attempt {attempt}: Generating solution for {compiler_id}...[/blue]")
+            console.print(f"[blue]  Attempt {attempt}: Generating solution for {compiler_id} (two-step process)...[/blue]")
             
             # Get problem statement
             problem_statement = self._get_problem_statement(problem_info)
             
-            # Generate prompt based on language and problem
-            prompt = self._create_prompt(problem_statement, compiler_id)
+            # STEP 1: Generate thoughts/process and initial code
+            console.print(f"[blue]    Step 1: Generating approach and initial code...[/blue]")
+            step1_prompt = self._create_step1_prompt(problem_statement, compiler_id)
             
-            # Call OpenAI API
-            response = self.client.chat.completions.create(
+            step1_response = self.client.chat.completions.create(
                 model=self.config.model,
                 messages=[
                     {
                         "role": "system",
-                        "content": self._get_system_prompt(compiler_id)
+                        "content": self._get_step1_system_prompt(compiler_id)
                     },
                     {
                         "role": "user",
-                        "content": prompt
+                        "content": step1_prompt
                     }
                 ],
                 max_tokens=self.config.max_tokens,
@@ -81,40 +81,74 @@ class SolutionGenerator:
                 timeout=self.config.timeout
             )
             
-            # Extract code from response
-            raw_response = response.choices[0].message.content
+            step1_raw_response = step1_response.choices[0].message.content
+            
+            # STEP 2: Format the previous response to exact output requirements
+            console.print(f"[blue]    Step 2: Formatting to exact requirements...[/blue]")
+            step2_prompt = self._create_step2_prompt(step1_raw_response, compiler_id)
+            
+            step2_response = self.client.chat.completions.create(
+                model=self.config.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": self._get_step2_system_prompt(compiler_id)
+                    },
+                    {
+                        "role": "user",
+                        "content": step2_prompt
+                    }
+                ],
+                max_tokens=self.config.max_tokens,
+                temperature=0.1,  # Lower temperature for formatting step
+                timeout=self.config.timeout
+            )
+            
+            # Extract code from the final response
+            final_raw_response = step2_response.choices[0].message.content
             
             # Save raw response for debugging if enabled
             extraction_failed = False
             try:
-                code = self._extract_code(raw_response, compiler_id)
+                code = self._extract_code(final_raw_response, compiler_id)
                 if not code:
                     extraction_failed = True
-                    raise ValueError("No code found in OpenAI response")
+                    raise ValueError("No code found in Step 2 response")
             except Exception as e:
                 extraction_failed = True
-                self._save_raw_response_on_failure(raw_response, problem_info, compiler_id, attempt, "extraction_failed", str(e))
+                self._save_raw_response_on_failure(final_raw_response, problem_info, compiler_id, attempt, "extraction_failed", str(e))
+                # Also save step 1 response for debugging
+                self._save_raw_response_on_failure(step1_raw_response, problem_info, compiler_id, attempt, "step1_response", "Step 1 response for debugging")
                 raise
             
-            # Save raw response if logging is enabled (success case)
-            self._save_raw_response(raw_response, problem_info, compiler_id, attempt, "success")
+            # Save raw responses if logging is enabled (success case)
+            self._save_raw_response(step1_raw_response, problem_info, compiler_id, attempt, "step1_success")
+            self._save_raw_response(final_raw_response, problem_info, compiler_id, attempt, "step2_success")
+            
+            # Calculate total token usage
+            total_tokens = step1_response.usage.total_tokens + step2_response.usage.total_tokens
             
             result = {
                 "success": True,
                 "code": code,
-                "raw_response": raw_response,
+                "raw_response": final_raw_response,
+                "step1_response": step1_raw_response,
                 "compiler_id": compiler_id,
                 "attempt": attempt,
                 "model": self.config.model,
                 "timestamp": datetime.now().isoformat(),
                 "token_usage": {
-                    "prompt_tokens": response.usage.prompt_tokens,
-                    "completion_tokens": response.usage.completion_tokens,
-                    "total_tokens": response.usage.total_tokens
+                    "step1_prompt_tokens": step1_response.usage.prompt_tokens,
+                    "step1_completion_tokens": step1_response.usage.completion_tokens,
+                    "step1_total_tokens": step1_response.usage.total_tokens,
+                    "step2_prompt_tokens": step2_response.usage.prompt_tokens,
+                    "step2_completion_tokens": step2_response.usage.completion_tokens,
+                    "step2_total_tokens": step2_response.usage.total_tokens,
+                    "total_tokens": total_tokens
                 }
             }
             
-            console.print(f"[green]  ✓ Solution generated ({response.usage.total_tokens} tokens)[/green]")
+            console.print(f"[green]  ✓ Two-step solution generated ({total_tokens} tokens)[/green]")
             return result
             
         except Exception as e:
@@ -275,6 +309,106 @@ Write your {language_name} solution below:"""
             "JDK": "Java"
         }
         return mapping.get(compiler_id, compiler_id)
+    
+    def _get_step1_system_prompt(self, compiler_id: str) -> str:
+        """Get the system prompt for step 1: thinking and initial code generation"""
+        
+        language_name = self._get_language_name(compiler_id)
+        
+        return f"""You are an expert competitive programming assistant. Your task is to analyze programming problems and develop solutions.
+
+This is STEP 1 of a two-step process. In this step, you should:
+
+1. ANALYZE the problem thoroughly
+2. THINK through the approach and algorithm
+3. GENERATE the initial code solution
+
+Be thorough in your analysis and explanation. You can include:
+- Problem understanding
+- Algorithm approach
+- Key insights
+- Implementation details
+- Code with comments if helpful
+
+Focus on correctness and completeness. Don't worry about exact formatting in this step - that will be handled in step 2.
+
+Target language: {language_name}"""
+
+    def _get_step2_system_prompt(self, compiler_id: str) -> str:
+        """Get the system prompt for step 2: exact formatting"""
+        
+        base_prompt = """You are a code formatter that takes an AI-generated solution and formats it to exact submission requirements.
+
+CRITICAL: Your ONLY job is to extract and format the final code for submission. 
+
+REQUIREMENTS:
+- Output ONLY the clean, executable code
+- NO explanations, comments, or text before/after the code
+- NO markdown formatting (no ```)
+- Match the exact output format requirements from the problem
+- Ensure the code is ready for direct submission to an online judge
+
+The code should be complete and runnable as-is."""
+
+        if compiler_id == "Python3":
+            return base_prompt + """
+
+PYTHON SPECIFIC:
+- Use Python 3 syntax
+- Read input using input() function
+- Print output using print() function
+- Match output format exactly as specified in the problem
+- Do NOT use 'return' statements outside of functions
+- Write main execution code at the top level"""
+
+        elif compiler_id in ["G++17", "G++"]:
+            return base_prompt + """
+
+C++ SPECIFIC:
+- Include necessary headers (#include <iostream>, etc.)
+- Include proper main() function
+- Use std::cin/cout for input/output
+- Match output format exactly as specified"""
+
+        elif compiler_id == "JDK":
+            return base_prompt + """
+
+JAVA SPECIFIC:
+- Public class named 'Main'
+- Include main method: public static void main(String[] args)
+- Use appropriate input/output methods
+- Match output format exactly as specified"""
+
+        return base_prompt
+
+    def _create_step1_prompt(self, problem_statement: str, compiler_id: str) -> str:
+        """Create prompt for step 1: analysis and initial code generation"""
+        
+        language_name = self._get_language_name(compiler_id)
+        
+        return f"""Analyze this competitive programming problem and develop a solution in {language_name}.
+
+{problem_statement}
+
+Please provide:
+1. Your understanding of the problem
+2. The algorithm/approach you'll use
+3. Any key insights or edge cases to consider
+4. The complete {language_name} solution
+
+Be thorough in your analysis and make sure your solution handles all the test cases correctly."""
+
+    def _create_step2_prompt(self, step1_response: str, compiler_id: str) -> str:
+        """Create prompt for step 2: exact formatting"""
+        
+        language_name = self._get_language_name(compiler_id)
+        
+        return f"""Take the following AI-generated solution and extract ONLY the final {language_name} code for submission.
+
+Previous response:
+{step1_response}
+
+Output ONLY the clean, executable {language_name} code with no explanations, comments, or formatting. The code should be ready for direct submission to an online judge."""
     
     def _extract_code(self, response: str, compiler_id: str) -> Optional[str]:
         """Extract code from OpenAI response"""
