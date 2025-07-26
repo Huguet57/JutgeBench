@@ -16,3 +16,4 @@ solver:
   max_generation_attempts: 3
   enable_local_testing: true
   log_level: "INFO"
+  accepted_verdicts: ["AC", "PE"]  # Verdicts considered as correct answers

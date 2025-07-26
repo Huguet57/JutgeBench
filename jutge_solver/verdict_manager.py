@@ -16,9 +16,10 @@ logger = logging.getLogger(__name__)
 class VerdictManager:
     """Manages submission verdict polling and interpretation"""
     
-    def __init__(self, jutge_client, jutge_config):
+    def __init__(self, jutge_client, jutge_config, accepted_verdicts=None):
         self.client = jutge_client
         self.config = jutge_config
+        self.accepted_verdicts = accepted_verdicts or ["AC"]
         
         # Verdict interpretations
         self.verdict_meanings = {
@@ -201,7 +202,7 @@ class VerdictManager:
         interpretation = {
             "verdict": verdict,
             "meaning": self.verdict_meanings.get(verdict, "Unknown"),
-            "success": verdict == "AC",
+            "success": verdict in self.accepted_verdicts,
             "should_retry": verdict in ["CE", "RE", "IE"],  # Errors that might be fixable
             "is_timeout": verdict in ["TLE"],
             "is_memory_issue": verdict in ["MLE", "OLE"],

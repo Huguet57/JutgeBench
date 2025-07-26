@@ -44,7 +44,7 @@ class SolutionGenerator:
     
     def generate_solution(self, problem_info: Dict[str, Any], compiler_id: str, attempt: int = 1) -> Dict[str, Any]:
         """
-        Generate a solution for the given problem
+        Generate a solution for the given problem using a two-step process
         
         Args:
             problem_info: Problem information from problem analyzer
@@ -55,25 +55,25 @@ class SolutionGenerator:
             Dict containing generation results
         """
         try:
-            console.print(f"[blue]  Attempt {attempt}: Generating solution for {compiler_id}...[/blue]")
+            console.print(f"[blue]  Attempt {attempt}: Generating solution for {compiler_id} (two-step process)...[/blue]")
             
             # Get problem statement
             problem_statement = self._get_problem_statement(problem_info)
             
-            # Generate prompt based on language and problem
-            prompt = self._create_prompt(problem_statement, compiler_id)
+            # STEP 1: Generate thoughts/process and initial code
+            console.print(f"[blue]    Step 1: Generating approach and initial code...[/blue]")
+            step1_prompt = self._create_step1_prompt(problem_statement, compiler_id, problem_info)
             
-            # Call OpenAI API
-            response = self.client.chat.completions.create(
+            step1_response = self.client.chat.completions.create(
                 model=self.config.model,
                 messages=[
                     {
                         "role": "system",
-                        "content": self._get_system_prompt(compiler_id)
+                        "content": self._get_step1_system_prompt(compiler_id)
                     },
                     {
                         "role": "user",
-                        "content": prompt
+                        "content": step1_prompt
                     }
                 ],
                 max_tokens=self.config.max_tokens,
@@ -81,40 +81,74 @@ class SolutionGenerator:
                 timeout=self.config.timeout
             )
             
-            # Extract code from response
-            raw_response = response.choices[0].message.content
+            step1_raw_response = step1_response.choices[0].message.content
+            
+            # STEP 2: Format the previous response to exact output requirements
+            console.print(f"[blue]    Step 2: Formatting to exact requirements...[/blue]")
+            step2_prompt = self._create_step2_prompt(step1_raw_response, compiler_id, problem_info)
+            
+            step2_response = self.client.chat.completions.create(
+                model=self.config.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": self._get_step2_system_prompt(compiler_id)
+                    },
+                    {
+                        "role": "user",
+                        "content": step2_prompt
+                    }
+                ],
+                max_tokens=self.config.max_tokens,
+                temperature=0.1,  # Lower temperature for formatting step
+                timeout=self.config.timeout
+            )
+            
+            # Extract code from the final response
+            final_raw_response = step2_response.choices[0].message.content
             
             # Save raw response for debugging if enabled
             extraction_failed = False
             try:
-                code = self._extract_code(raw_response, compiler_id)
+                code = self._extract_code(final_raw_response, compiler_id)
                 if not code:
                     extraction_failed = True
-                    raise ValueError("No code found in OpenAI response")
+                    raise ValueError("No code found in Step 2 response")
             except Exception as e:
                 extraction_failed = True
-                self._save_raw_response_on_failure(raw_response, problem_info, compiler_id, attempt, "extraction_failed", str(e))
+                self._save_raw_response_on_failure(final_raw_response, problem_info, compiler_id, attempt, "extraction_failed", str(e))
+                # Also save step 1 response for debugging
+                self._save_raw_response_on_failure(step1_raw_response, problem_info, compiler_id, attempt, "step1_response", "Step 1 response for debugging")
                 raise
             
-            # Save raw response if logging is enabled (success case)
-            self._save_raw_response(raw_response, problem_info, compiler_id, attempt, "success")
+            # Save raw responses if logging is enabled (success case)
+            self._save_raw_response(step1_raw_response, problem_info, compiler_id, attempt, "step1_success")
+            self._save_raw_response(final_raw_response, problem_info, compiler_id, attempt, "step2_success")
+            
+            # Calculate total token usage
+            total_tokens = step1_response.usage.total_tokens + step2_response.usage.total_tokens
             
             result = {
                 "success": True,
                 "code": code,
-                "raw_response": raw_response,
+                "raw_response": final_raw_response,
+                "step1_response": step1_raw_response,
                 "compiler_id": compiler_id,
                 "attempt": attempt,
                 "model": self.config.model,
                 "timestamp": datetime.now().isoformat(),
                 "token_usage": {
-                    "prompt_tokens": response.usage.prompt_tokens,
-                    "completion_tokens": response.usage.completion_tokens,
-                    "total_tokens": response.usage.total_tokens
+                    "step1_prompt_tokens": step1_response.usage.prompt_tokens,
+                    "step1_completion_tokens": step1_response.usage.completion_tokens,
+                    "step1_total_tokens": step1_response.usage.total_tokens,
+                    "step2_prompt_tokens": step2_response.usage.prompt_tokens,
+                    "step2_completion_tokens": step2_response.usage.completion_tokens,
+                    "step2_total_tokens": step2_response.usage.total_tokens,
+                    "total_tokens": total_tokens
                 }
             }
             
-            console.print(f"[green]  ✓ Solution generated ({response.usage.total_tokens} tokens)[/green]")
+            console.print(f"[green]  ✓ Two-step solution generated ({total_tokens} tokens)[/green]")
             return result
             
         except Exception as e:
@@ -184,6 +218,13 @@ class SolutionGenerator:
         
         base_prompt = """You are an expert competitive programming assistant. Your task is to solve programming problems with clean, efficient, and correct code.
 
+🚨 CRITICAL COMPLETENESS REQUIREMENTS:
+- Your solution MUST be a COMPLETE, RUNNABLE program
+- ALWAYS include input reading (using input(), cin, Scanner, etc.)
+- ALWAYS include output printing (using print(), cout, System.out, etc.)
+- NEVER submit partial code, snippets, or incomplete solutions
+- The code must work when executed directly without any additions
+
 CRITICAL OUTPUT FORMAT REQUIREMENT:
 - Your program's output must match the expected output format EXACTLY - character by character
 - Pay extremely close attention to spacing, punctuation, commas, parentheses, and separators
@@ -196,42 +237,119 @@ CODE REQUIREMENTS:
 - If you must use formatting, we will extract the code, but raw code is strongly preferred
 - Ensure the code handles all input/output exactly as specified
 - Use efficient algorithms appropriate for competitive programming
-- Make sure to handle edge cases and constraints"""
+- Make sure to handle edge cases and constraints
+
+🔍 MANDATORY CHECKLIST - Your code MUST include:
+✅ Input reading mechanism (input(), scanf, cin, Scanner, etc.)
+✅ All necessary variable declarations
+✅ Complete algorithm implementation  
+✅ Output printing mechanism (print(), printf, cout, System.out, etc.)
+✅ Proper program structure (main function if required)"""
 
         if compiler_id == "Python3":
             return base_prompt + """
 
-PYTHON SPECIFIC:
+PYTHON SPECIFIC REQUIREMENTS:
 - Use Python 3 syntax
-- Read input using input() function
-- Print output using print() function - match format exactly as shown in Expected Output
+- MANDATORY: Read input using input() function - NEVER assume variables exist
+- MANDATORY: Print output using print() function - match format exactly as shown in Expected Output
 - Be careful with integer division (use // for floor division)
 - Use print() with appropriate separators and end parameters to match exact format
 - Example: print(a, b, c) for space-separated vs print(f"({a},{b},{c})") for parentheses format
-- CRITICAL: Do NOT use 'return' statements outside of functions - this causes SyntaxError
-- Write main execution code at the top level, not inside functions unless specifically needed
-- If you must use functions, ensure all code paths are properly structured
+
+🚨 PYTHON COMPLETENESS CHECKLIST:
+✅ ALWAYS start with input reading: input(), map(int, input().split()), etc.
+✅ ALWAYS end with print() statement(s) producing the exact expected output
+✅ NEVER use 'return' statements outside of functions - this causes SyntaxError
+✅ Write main execution code at the top level, not inside functions unless specifically needed
+✅ NEVER submit code that only assigns variables without printing results
+✅ NEVER submit expressions like "result = char.lower()" without printing
+
+COMPLETE PYTHON TEMPLATE PATTERN:
+# Read input first
+data = input()  # or appropriate input reading
+# Process the data
+result = process(data)  # your algorithm here
+# Print the result
+print(result)  # or appropriate output format
+
+CRITICAL: If you don't include BOTH input reading AND print statements, your solution will fail!
 """
         elif compiler_id in ["G++17", "G++"]:
             return base_prompt + """
 
-C++ SPECIFIC:
+C++ SPECIFIC REQUIREMENTS:
 - Use standard competitive programming includes: #include <iostream> and others as needed
-- Include proper main() function
-- Use std::cin/cout for input/output - match format exactly as shown in Expected Output
+- MANDATORY: Include proper main() function
+- MANDATORY: Read input using std::cin, scanf, or similar - NEVER assume variables exist
+- MANDATORY: Print output using std::cout, printf, or similar - match format exactly as shown in Expected Output
 - Pay attention to spacing and separators: cout << a << " " << b for space-separated vs cout << "(" << a << "," << b << "," << c << ")" for parentheses format
+
+🚨 C++ COMPLETENESS CHECKLIST:
+✅ #include <iostream> (and other necessary headers)
+✅ int main() function definition
+✅ Input reading inside main (cin >> variables)
+✅ Algorithm implementation
+✅ Output printing (cout << result)
+✅ return 0; statement
+
+COMPLETE C++ TEMPLATE PATTERN:
+#include <iostream>
+using namespace std;
+
+int main() {
+    // Read input
+    int a, b; // or appropriate variable types
+    cin >> a >> b; // or appropriate input reading
+    
+    // Process
+    int result = a + b; // your algorithm here
+    
+    // Print output
+    cout << result << endl; // or appropriate output format
+    
+    return 0;
+}
 """
 
         elif compiler_id == "JDK":
             return base_prompt + """
 
-JAVA SPECIFIC:
+JAVA SPECIFIC REQUIREMENTS:
 - Create a public class named 'Main'
-- Include proper main method: public static void main(String[] args)
-- Use Scanner for input or BufferedReader for faster input
-- System.out.println() or System.out.print() for output - match format exactly as shown in Expected Output
+- MANDATORY: Include proper main method: public static void main(String[] args)
+- MANDATORY: Read input using Scanner, BufferedReader, or similar - NEVER assume variables exist
+- MANDATORY: Print output using System.out.println() or System.out.print() - match format exactly as shown in Expected Output
 - Pay attention to spacing and separators: System.out.println(a + " " + b) for space-separated vs System.out.println("(" + a + "," + b + "," + c + ")") for parentheses format
-- Be careful with data types and overflow"""
+- Be careful with data types and overflow
+
+🚨 JAVA COMPLETENESS CHECKLIST:
+✅ import java.util.Scanner; (or other necessary imports)
+✅ public class Main declaration
+✅ public static void main(String[] args) method
+✅ Scanner input reading inside main
+✅ Algorithm implementation
+✅ System.out printing statements
+
+COMPLETE JAVA TEMPLATE PATTERN:
+import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        
+        // Read input
+        int a = scanner.nextInt(); // or appropriate input reading
+        int b = scanner.nextInt();
+        
+        // Process
+        int result = a + b; // your algorithm here
+        
+        // Print output
+        System.out.println(result); // or appropriate output format
+    }
+}
+"""
 
         else:
             return base_prompt
@@ -245,6 +363,12 @@ JAVA SPECIFIC:
 
 {problem_statement}
 
+🚨 CRITICAL COMPLETENESS REQUIREMENTS:
+Your solution must be a COMPLETE, RUNNABLE program that includes:
+1. ✅ INPUT READING: Read all required input using appropriate methods
+2. ✅ ALGORITHM: Implement the complete solution logic
+3. ✅ OUTPUT PRINTING: Print the result in the exact required format
+
 CRITICAL OUTPUT FORMAT Requirements:
 - Your output must match the expected output format EXACTLY - character by character
 - Pay close attention to the "Expected Output" examples in the test cases above
@@ -254,6 +378,13 @@ CRITICAL OUTPUT FORMAT Requirements:
 - Even a single character difference will cause your solution to be marked as WRONG
 - The sample and public test cases show the EXACT format required
 
+🔍 MANDATORY VERIFICATION CHECKLIST:
+Before submitting, verify your code has:
+✅ Input reading mechanism (never assume variables exist)
+✅ Complete algorithm implementation
+✅ Output printing mechanism (never leave results unprinted)
+✅ Exact output format matching the examples
+
 Code Requirements:
 - Provide only the complete, runnable code
 - Output raw code directly (no markdown formatting, no ```)
@@ -262,7 +393,7 @@ Code Requirements:
 - Ensure the solution is efficient and handles edge cases
 - Code should be ready to submit to an online judge
 
-Write your {language_name} solution below:"""
+Write your complete {language_name} solution below:"""
 
         return prompt
     
@@ -275,6 +406,746 @@ Write your {language_name} solution below:"""
             "JDK": "Java"
         }
         return mapping.get(compiler_id, compiler_id)
+    
+    def _get_step1_system_prompt(self, compiler_id: str) -> str:
+        """Get the system prompt for step 1: thinking and initial code generation"""
+        
+        language_name = self._get_language_name(compiler_id)
+        
+        base_step1_prompt = f"""You are an expert competitive programming assistant. Your task is to analyze programming problems and develop solutions.
+
+This is STEP 1 of a two-step process. In this step, you should:
+
+1. ANALYZE the problem thoroughly
+2. THINK through the approach and algorithm
+3. GENERATE the initial code solution
+
+🚨 CRITICAL: Your code solution must be COMPLETE and RUNNABLE, including:
+✅ INPUT READING: Always read input using appropriate methods (input(), cin, Scanner)
+✅ ALGORITHM: Complete solution logic 
+✅ OUTPUT PRINTING: Always print results using appropriate methods (print(), cout, System.out)
+
+Be thorough in your analysis and explanation. You can include:
+- Problem understanding
+- Algorithm approach
+- Key insights
+- Implementation details
+- Code with comments if helpful
+
+Focus on correctness and completeness. Don't worry about exact formatting in this step - that will be handled in step 2.
+
+Target language: {language_name}"""
+
+        if compiler_id == "Python3":
+            return base_step1_prompt + """
+
+CRITICAL PYTHON SYNTAX CONSTRAINTS:
+- NEVER use 'return' statements outside of functions - causes SyntaxError: 'return' outside function
+- NEVER use 'continue' statements outside of loops - causes SyntaxError: 'continue' not properly in loop  
+- NEVER use 'break' statements outside of loops - causes SyntaxError: 'break' outside loop
+- These keywords MUST be used only in their proper contexts:
+  * 'return' only inside function definitions (def)
+  * 'continue' and 'break' only inside loop statements (for/while)
+- For early exit logic, use conditional blocks (if/elif/else) or organize code properly in functions
+- Write main execution code at the top level, not inside functions unless necessary
+- Use proper control flow with if/elif/else statements for different cases
+
+🚨 PYTHON COMPLETENESS REQUIREMENTS:
+✅ ALWAYS start with input reading: input(), input().split(), map(int, input().split()), etc.
+✅ ALWAYS end with print() statements - NEVER leave results unprinted
+✅ NEVER submit partial code like "result = char.lower()" without input reading and printing
+✅ Make sure the code is a complete program that runs from start to finish
+
+REQUIRED PYTHON STRUCTURE:
+# Step 1: Read input
+data = input()  # or appropriate input method
+
+# Step 2: Process/solve
+result = solve(data)  # your algorithm here
+
+# Step 3: Print output  
+print(result)  # or appropriate output format"""
+        
+        return base_step1_prompt
+
+    def _get_step2_system_prompt(self, compiler_id: str) -> str:
+        """Get the system prompt for step 2: exact formatting"""
+        
+        base_prompt = """You are a code formatter that takes an AI-generated solution and formats it to exact submission requirements.
+
+CRITICAL: Your ONLY job is to extract and format the final code for submission.
+
+🚨 MANDATORY COMPLETENESS CHECK:
+Before outputting code, verify it includes:
+✅ INPUT READING: Code must read input (input(), cin, Scanner, etc.)
+✅ OUTPUT PRINTING: Code must print results (print(), cout, System.out, etc.)
+✅ COMPLETE ALGORITHM: Full solution implementation
+✅ PROPER STRUCTURE: Runnable program with correct syntax
+
+If the step 1 response is missing input reading or print statements, you MUST add them!
+
+ABSOLUTE OUTPUT FORMAT REQUIREMENTS:
+- Study the test cases CAREFULLY - the "Expected Output" shows the EXACT format required
+- Your code output must match EXACTLY: spacing, punctuation, separators, newlines
+- Even ONE wrong character will cause WRONG verdict
+- Look at Expected Output patterns: "2 3 1" vs "(2,3,1)" vs "2,3,1" - match exactly
+- Count spaces, check for parentheses, commas, brackets - be precise
+
+CODE REQUIREMENTS:
+- Output ONLY the clean, executable code
+- NO explanations, comments, or text before/after the code  
+- NO markdown formatting (no ```)
+- Ensure the code is ready for direct submission to an online judge
+- The code should be complete and runnable as-is
+
+FORMAT ANALYSIS REQUIRED:
+- Before writing code, analyze the Expected Output format in test cases
+- Identify exact patterns: space-separated, comma-separated, parentheses, etc.
+- Ensure your print statements match this format precisely"""
+
+        if compiler_id == "Python3":
+            return base_prompt + """
+
+PYTHON SPECIFIC:
+- Use Python 3 syntax
+- CRITICAL FORMAT MATCHING: Your print() statements must produce EXACTLY the Expected Output format
+- Examples of precise formatting:
+  * For "2 3 1": use print(a, b, c) or print(f"{a} {b} {c}")
+  * For "(2,3,1)": use print(f"({a},{b},{c})")  
+  * For "2,3,1": use print(f"{a},{b},{c}")
+  * For multiple lines: use separate print() calls
+
+🚨 MANDATORY COMPLETENESS VERIFICATION:
+If step 1 response is missing critical components, ADD THEM:
+
+Missing input reading? ADD: 
+- input() for single line
+- input().split() for multiple values  
+- map(int, input().split()) for integers
+- int(input()) for single integer
+
+Missing print statements? ADD:
+- print(result) for single output
+- print(a, b, c) for space-separated
+- print(f"({a},{b},{c})") for formatted output
+
+🚨 CRITICAL SYNTAX FIXING REQUIRED:
+- MANDATORY: Scan step 1 response for these FATAL syntax errors:
+  
+  1. 'return' statements outside functions (causes SyntaxError: 'return' outside function)
+  2. 'continue' statements outside loops (causes SyntaxError: 'continue' not properly in loop)
+  3. 'break' statements outside loops (causes SyntaxError: 'break' outside loop)
+
+- If ANY of these are found, you MUST fix them immediately
+- Replace control flow with proper structures:
+  
+  ❌ BROKEN (causes SyntaxError):
+  if n == 1:
+      print(1)
+      return  # ERROR: return outside function
+  
+  if condition:
+      continue  # ERROR: continue not in loop
+  
+  ✅ FIXED (works correctly):
+  if n == 1:
+      print(1)
+  else:
+      # handle other cases
+  
+  # Or use early exit with proper structure:
+  if condition:
+      # handle this case
+      pass
+  else:
+      # handle other cases
+
+- SCAN EVERY LINE: Look for standalone 'return', 'continue', 'break' keywords
+- These must ONLY appear inside their proper contexts (functions/loops)
+- Write main execution code at the top level
+- Double-check your print statements match the Expected Output format character-by-character
+- Your final code must be syntactically correct and executable
+
+🔍 FINAL VERIFICATION - Your output code MUST have:
+✅ Input reading at the beginning
+✅ Algorithm implementation in the middle  
+✅ Print statements at the end
+✅ Correct syntax (no return/continue/break outside proper contexts)
+✅ Exact output format matching test cases"""
+
+        elif compiler_id in ["G++17", "G++"]:
+            return base_prompt + """
+
+C++ SPECIFIC:
+- Include necessary headers (#include <iostream>, etc.)
+- Include proper main() function
+- Use std::cin/cout for input/output
+- Match output format exactly as specified
+
+🚨 MANDATORY COMPLETENESS VERIFICATION:
+If step 1 response is missing critical components, ADD THEM:
+
+Missing input reading? ADD:
+- cin >> variable; statements
+- Proper variable declarations
+
+Missing output printing? ADD:  
+- cout << result << endl; statements
+- Proper formatting to match expected output
+
+🔍 FINAL VERIFICATION - Your output code MUST have:
+✅ #include <iostream> and necessary headers
+✅ int main() function
+✅ Input reading with cin
+✅ Algorithm implementation
+✅ Output printing with cout
+✅ return 0; statement"""
+
+        elif compiler_id == "JDK":
+            return base_prompt + """
+
+JAVA SPECIFIC:
+- Public class named 'Main'
+- Include main method: public static void main(String[] args)
+- Use appropriate input/output methods
+- Match output format exactly as specified
+
+🚨 MANDATORY COMPLETENESS VERIFICATION:
+If step 1 response is missing critical components, ADD THEM:
+
+Missing input reading? ADD:
+- Scanner scanner = new Scanner(System.in);
+- scanner.nextInt(), scanner.nextLine(), etc.
+
+Missing output printing? ADD:
+- System.out.println() or System.out.print() statements
+- Proper formatting to match expected output
+
+🔍 FINAL VERIFICATION - Your output code MUST have:
+✅ import statements (Scanner, etc.)
+✅ public class Main
+✅ public static void main method
+✅ Scanner input reading
+✅ Algorithm implementation  
+✅ System.out printing statements"""
+
+        return base_prompt
+
+    def _create_step1_prompt(self, problem_statement: str, compiler_id: str, problem_info: Dict[str, Any] = None) -> str:
+        """Create prompt for step 1: analysis and initial code generation"""
+        
+        language_name = self._get_language_name(compiler_id)
+        
+        # Extract test case information to help with output format understanding
+        test_case_info = ""
+        if problem_info:
+            test_case_info = self._extract_test_cases_for_step1(problem_info)
+        
+        base_prompt = f"""Analyze this competitive programming problem and develop a solution in {language_name}.
+
+{problem_statement}
+
+{test_case_info}
+
+Please provide:
+1. Your understanding of the problem
+2. The algorithm/approach you'll use
+3. Any key insights or edge cases to consider
+4. The complete {language_name} solution
+
+Be thorough in your analysis and make sure your solution handles all the test cases correctly and produces the exact output format shown in the examples."""
+        
+        return base_prompt
+
+    def _extract_test_cases_for_step1(self, problem_info: Dict[str, Any]) -> str:
+        """Extract test case information for step 1 to help understand the expected output format"""
+        if not problem_info:
+            return ""
+            
+        test_cases = []
+        
+        # Get sample test cases
+        sample_testcases = problem_info.get("sample_testcases", [])
+        for i, testcase in enumerate(sample_testcases[:3], 1):  # Limit to first 3
+            try:
+                import base64
+                # Handle both dict access and attribute access
+                if hasattr(testcase, 'input_b64'):
+                    input_data = base64.b64decode(testcase.input_b64).decode('utf-8').strip()
+                    expected_output = base64.b64decode(testcase.correct_b64).decode('utf-8').strip()
+                else:
+                    input_data = base64.b64decode(testcase.get("input_b64", "")).decode('utf-8').strip()
+                    expected_output = base64.b64decode(testcase.get("correct_b64", "")).decode('utf-8').strip()
+                
+                test_cases.append((input_data, expected_output, f"Sample {i}"))
+            except Exception as e:
+                continue
+        
+        # Get public test cases if not enough samples
+        if len(test_cases) < 2:
+            public_testcases = problem_info.get("public_testcases", [])
+            for i, testcase in enumerate(public_testcases[:3], 1):
+                try:
+                    input_data = base64.b64decode(testcase.get("input_b64", "")).decode('utf-8').strip()
+                    expected_output = base64.b64decode(testcase.get("correct_b64", "")).decode('utf-8').strip()
+                    test_cases.append((input_data, expected_output, f"Public {i}"))
+                except:
+                    continue
+        
+        if not test_cases:
+            return ""
+        
+        # Build test case information for step 1
+        test_case_info = "📋 EXAMPLE TEST CASES (showing expected input/output format):\n"
+        test_case_info += "=" * 60 + "\n\n"
+        
+        for input_data, expected_output, case_type in test_cases:
+            test_case_info += f"{case_type} Test Case:\n"
+            test_case_info += f"Input:\n{input_data}\n\n"
+            test_case_info += f"Expected Output:\n{expected_output}\n\n"
+            test_case_info += "-" * 40 + "\n\n"
+        
+        test_case_info += "🎯 CRITICAL: Your solution must produce EXACTLY the output format shown above.\n"
+        test_case_info += "Pay close attention to spacing, separators, and line breaks.\n"
+        
+        return test_case_info
+
+    def _create_step2_prompt(self, step1_response: str, compiler_id: str, problem_info: Dict[str, Any] = None) -> str:
+        """Create prompt for step 2: exact formatting"""
+        
+        language_name = self._get_language_name(compiler_id)
+        
+        # Extract output format examples from test cases
+        format_examples = self._extract_output_format_examples(problem_info) if problem_info else ""
+        
+        # Detect completeness issues (missing input/output) and syntax issues
+        completeness_issues = self._detect_completeness_issues(step1_response, compiler_id)
+        syntax_issues = ""
+        if compiler_id == "Python3":
+            syntax_issues = self._detect_syntax_issues(step1_response)
+        
+        base_prompt = f"""Take the following AI-generated solution and extract ONLY the final {language_name} code for submission.
+
+{format_examples}
+
+{completeness_issues}
+
+{syntax_issues}
+
+Previous response:
+{step1_response}
+
+🚨 CRITICAL VERIFICATION REQUIRED:
+Check the previous response for these common issues and FIX them:
+1. ❌ Missing input reading → ADD appropriate input statements
+2. ❌ Missing print/output → ADD appropriate print statements  
+3. ❌ Incomplete code (partial expressions) → COMPLETE the solution
+4. ❌ Wrong output format → MATCH the expected format exactly
+
+CRITICAL: Study the Expected Output format above and ensure your code produces EXACTLY that format.
+
+Output ONLY the clean, executable {language_name} code with no explanations, comments, or formatting. The code should be ready for direct submission to an online judge."""
+        
+        return base_prompt
+    
+    def _detect_completeness_issues(self, step1_response: str, compiler_id: str) -> str:
+        """Detect missing input reading and print statements in step 1 response"""
+        
+        issues = []
+        
+        # Check for input reading
+        input_found = False
+        if compiler_id == "Python3":
+            input_patterns = ['input()', 'input().split()', 'map(int, input().split())', 'int(input())']
+            input_found = any(pattern in step1_response for pattern in input_patterns)
+        elif compiler_id in ["G++17", "G++"]:
+            input_patterns = ['cin >>', 'scanf(', 'getline(']
+            input_found = any(pattern in step1_response for pattern in input_patterns)
+        elif compiler_id == "JDK":
+            input_patterns = ['Scanner', 'nextInt()', 'nextLine()', 'BufferedReader']
+            input_found = any(pattern in step1_response for pattern in input_patterns)
+        
+        if not input_found:
+            issues.append("🚨 MISSING INPUT READING")
+        
+        # Check for output printing
+        output_found = False
+        if compiler_id == "Python3":
+            output_patterns = ['print(']
+            output_found = any(pattern in step1_response for pattern in output_patterns)
+        elif compiler_id in ["G++17", "G++"]:
+            output_patterns = ['cout <<', 'printf(']
+            output_found = any(pattern in step1_response for pattern in output_patterns)
+        elif compiler_id == "JDK":
+            output_patterns = ['System.out.print', 'System.out.println']
+            output_found = any(pattern in step1_response for pattern in output_patterns)
+        
+        if not output_found:
+            issues.append("🚨 MISSING OUTPUT PRINTING")
+        
+        # Check for incomplete code patterns
+        incomplete_patterns = []
+        if compiler_id == "Python3":
+            # Look for variable assignments without print statements that follow
+            lines = step1_response.split('\n')
+            for i, line in enumerate(lines):
+                stripped = line.strip()
+                # Check for result assignments that aren't followed by prints
+                if (stripped.startswith('result = ') and 
+                    not any('print(' in lines[j] for j in range(i+1, min(len(lines), i+5)))):
+                    incomplete_patterns.append(f"Assignment '{stripped}' not followed by print statement")
+        
+        if incomplete_patterns:
+            issues.append("🚨 INCOMPLETE CODE PATTERNS DETECTED")
+        
+        if not issues:
+            return ""
+        
+        issue_description = "🚨 CRITICAL COMPLETENESS ISSUES DETECTED:\n"
+        issue_description += "=" * 50 + "\n\n"
+        
+        if "🚨 MISSING INPUT READING" in issues:
+            issue_description += "❌ NO INPUT READING FOUND!\n"
+            if compiler_id == "Python3":
+                issue_description += "   MUST ADD: input(), input().split(), map(int, input().split()), etc.\n"
+            elif compiler_id in ["G++17", "G++"]:
+                issue_description += "   MUST ADD: cin >> variable; statements\n"
+            elif compiler_id == "JDK":
+                issue_description += "   MUST ADD: Scanner scanner = new Scanner(System.in); and reading methods\n"
+            issue_description += "\n"
+        
+        if "🚨 MISSING OUTPUT PRINTING" in issues:
+            issue_description += "❌ NO OUTPUT PRINTING FOUND!\n"
+            if compiler_id == "Python3":
+                issue_description += "   MUST ADD: print() statements to output results\n"
+            elif compiler_id in ["G++17", "G++"]:
+                issue_description += "   MUST ADD: cout << result << endl; statements\n"
+            elif compiler_id == "JDK":
+                issue_description += "   MUST ADD: System.out.println() or System.out.print() statements\n"
+            issue_description += "\n"
+        
+        if incomplete_patterns:
+            issue_description += "❌ INCOMPLETE CODE DETECTED:\n"
+            for pattern in incomplete_patterns:
+                issue_description += f"   • {pattern}\n"
+            issue_description += "\n"
+        
+        issue_description += "🔧 MANDATORY FIXES:\n"
+        issue_description += "✅ ADD input reading at the beginning\n"
+        issue_description += "✅ ADD output printing at the end\n" 
+        issue_description += "✅ COMPLETE any partial code snippets\n"
+        issue_description += "✅ ENSURE the code is a complete, runnable program\n\n"
+        
+        return issue_description
+    
+    def _detect_syntax_issues(self, step1_response: str) -> str:
+        """Detect problematic control flow statements in step 1 response and provide fixing instructions"""
+        
+        # Extract potential code blocks from step1 response
+        code_blocks = []
+        
+        # Look for markdown code blocks
+        import re
+        markdown_pattern = r'```(?:python|py)?\n?(.*?)```'
+        matches = re.findall(markdown_pattern, step1_response, re.DOTALL | re.IGNORECASE)
+        code_blocks.extend(matches)
+        
+        # Also check the whole response for code-like content
+        lines = step1_response.split('\n')
+        potential_code = []
+        for line in lines:
+            stripped = line.strip()
+            if (stripped.startswith('def ') or stripped.startswith('if ') or 
+                stripped.startswith('for ') or stripped.startswith('while ') or
+                'print(' in stripped or stripped.startswith('return') or
+                '=' in stripped and not stripped.startswith('#')):
+                potential_code.append(line)
+        
+        if potential_code:
+            code_blocks.append('\n'.join(potential_code))
+        
+        # Check for problematic control flow statements
+        problematic_statements = []
+        for code_block in code_blocks:
+            lines = code_block.split('\n')
+            in_function = False
+            in_loop = False
+            function_indent = 0
+            loop_stack = []  # Stack to track nested loops
+            
+            for i, line in enumerate(lines, 1):
+                stripped = line.strip()
+                current_indent = len(line) - len(line.lstrip())
+                
+                # Track if we're inside a function
+                if stripped.startswith('def '):
+                    in_function = True
+                    function_indent = current_indent
+                elif in_function and stripped and current_indent <= function_indent:
+                    # We've left the function (dedent to same level or less)
+                    in_function = False
+                    function_indent = 0
+                
+                # Track if we're inside a loop
+                if (stripped.startswith('for ') or stripped.startswith('while ')):
+                    loop_stack.append(current_indent)
+                    in_loop = True
+                elif in_loop and stripped and current_indent <= min(loop_stack) if loop_stack else False:
+                    # We've left all loops (dedent to same level or less than the outermost loop)
+                    loop_stack = [indent for indent in loop_stack if indent < current_indent]
+                    in_loop = len(loop_stack) > 0
+                
+                # Check for return statements outside functions
+                if 'return' in stripped:
+                    is_return_statement = (stripped == 'return' or 
+                                         stripped.startswith('return ') or 
+                                         stripped.startswith('return#') or
+                                         stripped.endswith('return'))
+                    
+                    if is_return_statement and not in_function:
+                        problematic_statements.append({
+                            'type': 'return',
+                            'error': 'return outside function',
+                            'line': i,
+                            'content': line,
+                            'context': lines[max(0, i-2):min(len(lines), i+2)]
+                        })
+                
+                # Check for continue statements outside loops
+                if 'continue' in stripped:
+                    is_continue_statement = (stripped == 'continue' or 
+                                           stripped.startswith('continue ') or 
+                                           stripped.startswith('continue#') or
+                                           stripped.endswith('continue'))
+                    
+                    if is_continue_statement and not in_loop:
+                        problematic_statements.append({
+                            'type': 'continue',
+                            'error': 'continue not properly in loop',
+                            'line': i,
+                            'content': line,
+                            'context': lines[max(0, i-2):min(len(lines), i+2)]
+                        })
+                
+                # Check for break statements outside loops
+                if 'break' in stripped:
+                    is_break_statement = (stripped == 'break' or 
+                                        stripped.startswith('break ') or 
+                                        stripped.startswith('break#') or
+                                        stripped.endswith('break'))
+                    
+                    if is_break_statement and not in_loop:
+                        problematic_statements.append({
+                            'type': 'break',
+                            'error': 'break outside loop',
+                            'line': i,
+                            'content': line,
+                            'context': lines[max(0, i-2):min(len(lines), i+2)]
+                        })
+        
+        if problematic_statements:
+            issue_description = "🚨 CRITICAL PYTHON SYNTAX ISSUES DETECTED:\n"
+            issue_description += "=" * 50 + "\n\n"
+            
+            # Group by type
+            returns = [s for s in problematic_statements if s['type'] == 'return']
+            continues = [s for s in problematic_statements if s['type'] == 'continue']
+            breaks = [s for s in problematic_statements if s['type'] == 'break']
+            
+            total_issues = len(problematic_statements)
+            issue_description += f"Found {total_issues} FATAL syntax error(s) in step 1 response:\n"
+            if returns:
+                issue_description += f"  • {len(returns)} 'return' statement(s) outside functions\n"
+            if continues:
+                issue_description += f"  • {len(continues)} 'continue' statement(s) outside loops\n"
+            if breaks:
+                issue_description += f"  • {len(breaks)} 'break' statement(s) outside loops\n"
+            issue_description += "\n"
+            
+            # Show details for each issue
+            for i, issue in enumerate(problematic_statements, 1):
+                issue_description += f"Issue {i} - SyntaxError: '{issue['error']}':\n"
+                issue_description += f"  Line: {issue['line']}\n"
+                issue_description += f"  Code: {issue['content'].strip()}\n"
+                issue_description += f"  Context:\n"
+                for ctx_line in issue['context']:
+                    issue_description += f"    {ctx_line}\n"
+                issue_description += "\n"
+            
+            issue_description += "MANDATORY FIXES REQUIRED:\n"
+            if returns:
+                issue_description += "✓ REMOVE all 'return' statements outside functions\n"
+            if continues:
+                issue_description += "✓ REMOVE all 'continue' statements outside loops\n"
+            if breaks:
+                issue_description += "✓ REMOVE all 'break' statements outside loops\n"
+            issue_description += "✓ Replace with proper if/elif/else conditional blocks\n"
+            issue_description += "✓ Use function/loop organization if complex logic needed\n"
+            issue_description += "✓ Ensure main execution code is at top level\n\n"
+            
+            issue_description += "EXAMPLE FIXES:\n"
+            issue_description += "❌ BAD:\n"
+            issue_description += "   if condition:\n"
+            issue_description += "       print('result')\n"
+            issue_description += "       return  # ERROR: return outside function\n"
+            issue_description += "   \n"
+            issue_description += "   if other_condition:\n"
+            issue_description += "       continue  # ERROR: continue not in loop\n"
+            issue_description += "\n"
+            issue_description += "✅ GOOD:\n"
+            issue_description += "   if condition:\n"
+            issue_description += "       print('result')\n"
+            issue_description += "   elif other_condition:\n"
+            issue_description += "       # handle this case\n"
+            issue_description += "       pass\n"
+            issue_description += "   else:\n"
+            issue_description += "       # handle remaining cases\n\n"
+            
+            return issue_description
+        
+        return ""
+    
+    def _extract_output_format_examples(self, problem_info: Dict[str, Any]) -> str:
+        """Extract structured output format analysis from test cases for step 2"""
+        if not problem_info:
+            return ""
+            
+        test_cases = []
+        
+        # Get sample test cases
+        sample_testcases = problem_info.get("sample_testcases", [])
+        for i, testcase in enumerate(sample_testcases[:3], 1):  # Limit to first 3
+            try:
+                input_data = base64.b64decode(testcase.get("input_b64", "")).decode('utf-8').strip()
+                expected_output = base64.b64decode(testcase.get("correct_b64", "")).decode('utf-8').strip()
+                test_cases.append((input_data, expected_output))
+            except:
+                continue
+        
+        # Get public test cases if not enough samples
+        if len(test_cases) < 2:
+            public_testcases = problem_info.get("public_testcases", [])
+            for testcase in public_testcases[:2]:
+                try:
+                    input_data = base64.b64decode(testcase.get("input_b64", "")).decode('utf-8').strip()
+                    expected_output = base64.b64decode(testcase.get("correct_b64", "")).decode('utf-8').strip()
+                    test_cases.append((input_data, expected_output))
+                except:
+                    continue
+        
+        if not test_cases:
+            return ""
+        
+        # Analyze format patterns
+        format_analysis = self._analyze_output_patterns(test_cases)
+        
+        # Build structured format guide
+        format_guide = "🎯 CRITICAL OUTPUT FORMAT REQUIREMENTS:\n"
+        format_guide += "=" * 50 + "\n\n"
+        
+        # Show test cases with detailed analysis
+        format_guide += "📋 TEST CASE ANALYSIS:\n"
+        for i, (input_data, expected_output) in enumerate(test_cases, 1):
+            format_guide += f"  Case {i}:\n"
+            format_guide += f"    Input:  '{input_data}'\n"
+            format_guide += f"    Output: '{expected_output}'\n"
+            format_guide += f"    Length: {len(expected_output)} characters\n"
+            if '\n' in expected_output:
+                lines = expected_output.split('\n')
+                format_guide += f"    Lines:  {len(lines)} lines\n"
+                for j, line in enumerate(lines, 1):
+                    format_guide += f"      Line {j}: '{line}' ({len(line)} chars)\n"
+            format_guide += "\n"
+        
+        # Add pattern analysis
+        format_guide += "🔍 FORMAT PATTERN ANALYSIS:\n"
+        format_guide += format_analysis + "\n"
+        
+        # Add specific Python code instructions
+        format_guide += "💻 EXACT PYTHON IMPLEMENTATION REQUIRED:\n"
+        python_code = self._generate_python_format_code(test_cases)
+        format_guide += python_code + "\n"
+        
+        format_guide += "⚠️  YOUR CODE MUST PRODUCE EXACTLY THE SAME OUTPUT - CHARACTER BY CHARACTER!\n"
+        
+        return format_guide
+    
+    def _analyze_output_patterns(self, test_cases: List[tuple]) -> str:
+        """Analyze output patterns to identify format requirements"""
+        if not test_cases:
+            return ""
+        
+        patterns = []
+        
+        # Check for common patterns
+        if all(' ' in output and ',' not in output and '(' not in output for _, output in test_cases):
+            patterns.append("✓ SPACE-SEPARATED format detected")
+            patterns.append("  Use: print(a, b, c) or print(f'{a} {b} {c}')")
+        
+        elif all('(' in output and ')' in output and ',' in output for _, output in test_cases):
+            patterns.append("✓ PARENTHESES WITH COMMAS format detected")
+            patterns.append("  Use: print(f'({a},{b},{c})')")
+        
+        elif all(',' in output and '(' not in output for _, output in test_cases):
+            patterns.append("✓ COMMA-SEPARATED format detected")
+            patterns.append("  Use: print(f'{a},{b},{c}')")
+        
+        # Check for multi-line output
+        if any('\n' in output for _, output in test_cases):
+            patterns.append("✓ MULTI-LINE output detected")
+            patterns.append("  Use: Multiple print() statements")
+        
+        # Check for specific characters
+        special_chars = set()
+        for _, output in test_cases:
+            for char in output:
+                if char not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 \n':
+                    special_chars.add(char)
+        
+        if special_chars:
+            patterns.append(f"✓ Special characters found: {', '.join(sorted(special_chars))}")
+            patterns.append("  Must include these exact characters in output")
+        
+        # Check for trailing newlines
+        has_trailing_newline = any(output.endswith('\n') for _, output in test_cases)
+        if has_trailing_newline:
+            patterns.append("✓ Trailing newline detected - use print() not print(..., end='')")
+        
+        return '\n'.join(patterns) if patterns else "Format pattern unclear - match examples exactly"
+    
+    def _generate_python_format_code(self, test_cases: List[tuple]) -> str:
+        """Generate specific Python code examples for the detected format"""
+        if not test_cases:
+            return ""
+        
+        first_output = test_cases[0][1]
+        
+        code_examples = []
+        
+        # Generate format-specific code
+        if ' ' in first_output and ',' not in first_output and '(' not in first_output:
+            # Space-separated
+            code_examples.append("# For space-separated output:")
+            code_examples.append("print(value1, value2, value3)  # Automatic spaces")
+            code_examples.append("# OR")
+            code_examples.append("print(f'{value1} {value2} {value3}')  # Manual spaces")
+        
+        elif '(' in first_output and ')' in first_output and ',' in first_output:
+            # Parentheses with commas
+            code_examples.append("# For parentheses with commas:")
+            code_examples.append("print(f'({value1},{value2},{value3})')")
+        
+        elif ',' in first_output and '(' not in first_output:
+            # Comma-separated
+            code_examples.append("# For comma-separated output:")
+            code_examples.append("print(f'{value1},{value2},{value3}')")
+        
+        if '\n' in first_output:
+            code_examples.append("# For multi-line output:")
+            code_examples.append("print('first line')")
+            code_examples.append("print('second line')")
+        
+        return '\n'.join(code_examples) if code_examples else "# Match the exact format shown above"
     
     def _extract_code(self, response: str, compiler_id: str) -> Optional[str]:
         """Extract code from OpenAI response"""

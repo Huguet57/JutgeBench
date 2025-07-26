@@ -51,7 +51,7 @@ class JutgeProblemSolver:
             'save_raw_on_failure_only': getattr(self.config.solver, 'save_raw_on_failure_only', False)
         }
         self.solution_generator = SolutionGenerator(self.openai_client, self.config.openai, raw_logging_config)
-        self.verdict_manager = VerdictManager(self.jutge_client, self.config.jutge)
+        self.verdict_manager = VerdictManager(self.jutge_client, self.config.jutge, self.config.solver.accepted_verdicts)
         
         self._authenticated = False
     
@@ -197,7 +197,7 @@ class JutgeProblemSolver:
         
         if results["success"]:
             verdict = results["final_verdict"]
-            color = "green" if verdict == "AC" else "red" if verdict in ["WA", "TLE", "CE"] else "yellow"
+            color = "green" if verdict in self.config.solver.accepted_verdicts else "red" if verdict in ["WA", "TLE", "CE"] else "yellow"
             console.print(f"[{color}]Final Verdict: {verdict}[/{color}]")
         else:
             console.print(f"[red]Status: FAILED - {results.get('error', 'Unknown error')}[/red]")
