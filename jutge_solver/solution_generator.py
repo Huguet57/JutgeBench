@@ -339,8 +339,13 @@ Target language: {language_name}"""
         if compiler_id == "Python3":
             return base_step1_prompt + """
 
-IMPORTANT PYTHON CONSTRAINTS:
-- NEVER use 'return' statements outside of functions - this causes SyntaxError
+CRITICAL PYTHON SYNTAX CONSTRAINTS:
+- NEVER use 'return' statements outside of functions - causes SyntaxError: 'return' outside function
+- NEVER use 'continue' statements outside of loops - causes SyntaxError: 'continue' not properly in loop  
+- NEVER use 'break' statements outside of loops - causes SyntaxError: 'break' outside loop
+- These keywords MUST be used only in their proper contexts:
+  * 'return' only inside function definitions (def)
+  * 'continue' and 'break' only inside loop statements (for/while)
 - For early exit logic, use conditional blocks (if/elif/else) or organize code properly in functions
 - Write main execution code at the top level, not inside functions unless necessary
 - Use proper control flow with if/elif/else statements for different cases"""
@@ -387,22 +392,38 @@ PYTHON SPECIFIC:
   * For multiple lines: use separate print() calls
 
 🚨 CRITICAL SYNTAX FIXING REQUIRED:
-- MANDATORY: Scan step 1 response for 'return' statements outside functions
-- If found, you MUST remove them and restructure the code properly
-- Replace return-based early exits with proper if/elif/else blocks
-- Transform code like this:
+- MANDATORY: Scan step 1 response for these FATAL syntax errors:
+  
+  1. 'return' statements outside functions (causes SyntaxError: 'return' outside function)
+  2. 'continue' statements outside loops (causes SyntaxError: 'continue' not properly in loop)
+  3. 'break' statements outside loops (causes SyntaxError: 'break' outside loop)
+
+- If ANY of these are found, you MUST fix them immediately
+- Replace control flow with proper structures:
   
   ❌ BROKEN (causes SyntaxError):
   if n == 1:
       print(1)
-      return
+      return  # ERROR: return outside function
+  
+  if condition:
+      continue  # ERROR: continue not in loop
   
   ✅ FIXED (works correctly):
   if n == 1:
       print(1)
   else:
       # handle other cases
+  
+  # Or use early exit with proper structure:
+  if condition:
+      # handle this case
+      pass
+  else:
+      # handle other cases
 
+- SCAN EVERY LINE: Look for standalone 'return', 'continue', 'break' keywords
+- These must ONLY appear inside their proper contexts (functions/loops)
 - Write main execution code at the top level
 - Double-check your print statements match the Expected Output format character-by-character
 - Your final code must be syntactically correct and executable"""
@@ -514,16 +535,16 @@ Be thorough in your analysis and make sure your solution handles all the test ca
         # Extract output format examples from test cases
         format_examples = self._extract_output_format_examples(problem_info) if problem_info else ""
         
-        # Detect problematic return statements for Python
-        return_issues = ""
+        # Detect problematic control flow statements for Python
+        syntax_issues = ""
         if compiler_id == "Python3":
-            return_issues = self._detect_return_issues(step1_response)
+            syntax_issues = self._detect_syntax_issues(step1_response)
         
         base_prompt = f"""Take the following AI-generated solution and extract ONLY the final {language_name} code for submission.
 
 {format_examples}
 
-{return_issues}
+{syntax_issues}
 
 Previous response:
 {step1_response}
@@ -534,8 +555,8 @@ Output ONLY the clean, executable {language_name} code with no explanations, com
         
         return base_prompt
     
-    def _detect_return_issues(self, step1_response: str) -> str:
-        """Detect problematic return statements in step 1 response and provide fixing instructions"""
+    def _detect_syntax_issues(self, step1_response: str) -> str:
+        """Detect problematic control flow statements in step 1 response and provide fixing instructions"""
         
         # Extract potential code blocks from step1 response
         code_blocks = []
@@ -560,12 +581,14 @@ Output ONLY the clean, executable {language_name} code with no explanations, com
         if potential_code:
             code_blocks.append('\n'.join(potential_code))
         
-        # Check for problematic return statements
-        problematic_returns = []
+        # Check for problematic control flow statements
+        problematic_statements = []
         for code_block in code_blocks:
             lines = code_block.split('\n')
             in_function = False
+            in_loop = False
             function_indent = 0
+            loop_stack = []  # Stack to track nested loops
             
             for i, line in enumerate(lines, 1):
                 stripped = line.strip()
@@ -580,28 +603,85 @@ Output ONLY the clean, executable {language_name} code with no explanations, com
                     in_function = False
                     function_indent = 0
                 
-                # Check for return statements
+                # Track if we're inside a loop
+                if (stripped.startswith('for ') or stripped.startswith('while ')):
+                    loop_stack.append(current_indent)
+                    in_loop = True
+                elif in_loop and stripped and current_indent <= min(loop_stack) if loop_stack else False:
+                    # We've left all loops (dedent to same level or less than the outermost loop)
+                    loop_stack = [indent for indent in loop_stack if indent < current_indent]
+                    in_loop = len(loop_stack) > 0
+                
+                # Check for return statements outside functions
                 if 'return' in stripped:
-                    # Check if it's a standalone return or return at start of line
                     is_return_statement = (stripped == 'return' or 
                                          stripped.startswith('return ') or 
                                          stripped.startswith('return#') or
                                          stripped.endswith('return'))
                     
                     if is_return_statement and not in_function:
-                        problematic_returns.append({
+                        problematic_statements.append({
+                            'type': 'return',
+                            'error': 'return outside function',
+                            'line': i,
+                            'content': line,
+                            'context': lines[max(0, i-2):min(len(lines), i+2)]
+                        })
+                
+                # Check for continue statements outside loops
+                if 'continue' in stripped:
+                    is_continue_statement = (stripped == 'continue' or 
+                                           stripped.startswith('continue ') or 
+                                           stripped.startswith('continue#') or
+                                           stripped.endswith('continue'))
+                    
+                    if is_continue_statement and not in_loop:
+                        problematic_statements.append({
+                            'type': 'continue',
+                            'error': 'continue not properly in loop',
+                            'line': i,
+                            'content': line,
+                            'context': lines[max(0, i-2):min(len(lines), i+2)]
+                        })
+                
+                # Check for break statements outside loops
+                if 'break' in stripped:
+                    is_break_statement = (stripped == 'break' or 
+                                        stripped.startswith('break ') or 
+                                        stripped.startswith('break#') or
+                                        stripped.endswith('break'))
+                    
+                    if is_break_statement and not in_loop:
+                        problematic_statements.append({
+                            'type': 'break',
+                            'error': 'break outside loop',
                             'line': i,
                             'content': line,
                             'context': lines[max(0, i-2):min(len(lines), i+2)]
                         })
         
-        if problematic_returns:
-            issue_description = "🚨 CRITICAL PYTHON SYNTAX ISSUE DETECTED:\n"
-            issue_description += "=" * 45 + "\n\n"
-            issue_description += f"Found {len(problematic_returns)} problematic 'return' statement(s) outside functions in step 1 response!\n\n"
+        if problematic_statements:
+            issue_description = "🚨 CRITICAL PYTHON SYNTAX ISSUES DETECTED:\n"
+            issue_description += "=" * 50 + "\n\n"
             
-            for i, issue in enumerate(problematic_returns, 1):
-                issue_description += f"Issue {i}:\n"
+            # Group by type
+            returns = [s for s in problematic_statements if s['type'] == 'return']
+            continues = [s for s in problematic_statements if s['type'] == 'continue']
+            breaks = [s for s in problematic_statements if s['type'] == 'break']
+            
+            total_issues = len(problematic_statements)
+            issue_description += f"Found {total_issues} FATAL syntax error(s) in step 1 response:\n"
+            if returns:
+                issue_description += f"  • {len(returns)} 'return' statement(s) outside functions\n"
+            if continues:
+                issue_description += f"  • {len(continues)} 'continue' statement(s) outside loops\n"
+            if breaks:
+                issue_description += f"  • {len(breaks)} 'break' statement(s) outside loops\n"
+            issue_description += "\n"
+            
+            # Show details for each issue
+            for i, issue in enumerate(problematic_statements, 1):
+                issue_description += f"Issue {i} - SyntaxError: '{issue['error']}':\n"
                 issue_description += f"  Line: {issue['line']}\n"
                 issue_description += f"  Code: {issue['content'].strip()}\n"
                 issue_description += f"  Context:\n"
@@ -610,21 +690,33 @@ Output ONLY the clean, executable {language_name} code with no explanations, com
                 issue_description += "\n"
             
             issue_description += "MANDATORY FIXES REQUIRED:\n"
-            issue_description += "✓ REMOVE all 'return' statements outside functions\n"
+            if returns:
+                issue_description += "✓ REMOVE all 'return' statements outside functions\n"
+            if continues:
+                issue_description += "✓ REMOVE all 'continue' statements outside loops\n"
+            if breaks:
+                issue_description += "✓ REMOVE all 'break' statements outside loops\n"
             issue_description += "✓ Replace with proper if/elif/else conditional blocks\n"
-            issue_description += "✓ Use function organization if complex logic needed\n"
+            issue_description += "✓ Use function/loop organization if complex logic needed\n"
             issue_description += "✓ Ensure main execution code is at top level\n\n"
+            
             issue_description += "EXAMPLE FIXES:\n"
             issue_description += "❌ BAD:\n"
             issue_description += "   if condition:\n"
             issue_description += "       print('result')\n"
-            issue_description += "       return  # SYNTAX ERROR!\n"
+            issue_description += "       return  # ERROR: return outside function\n"
+            issue_description += "   \n"
+            issue_description += "   if other_condition:\n"
+            issue_description += "       continue  # ERROR: continue not in loop\n"
             issue_description += "\n"
             issue_description += "✅ GOOD:\n"
             issue_description += "   if condition:\n"
             issue_description += "       print('result')\n"
+            issue_description += "   elif other_condition:\n"
+            issue_description += "       # handle this case\n"
+            issue_description += "       pass\n"
             issue_description += "   else:\n"
-            issue_description += "       # handle other cases\n\n"
+            issue_description += "       # handle remaining cases\n\n"
             
             return issue_description
         
