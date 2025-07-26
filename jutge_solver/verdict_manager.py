@@ -201,7 +201,7 @@ class VerdictManager:
         interpretation = {
             "verdict": verdict,
             "meaning": self.verdict_meanings.get(verdict, "Unknown"),
-            "success": verdict == "AC",
+            "success": verdict in ["AC", "PE"],
             "should_retry": verdict in ["CE", "RE", "IE"],  # Errors that might be fixable
             "is_timeout": verdict in ["TLE"],
             "is_memory_issue": verdict in ["MLE", "OLE"],

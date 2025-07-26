@@ -197,7 +197,7 @@ class JutgeProblemSolver:
         
         if results["success"]:
             verdict = results["final_verdict"]
-            color = "green" if verdict == "AC" else "red" if verdict in ["WA", "TLE", "CE"] else "yellow"
+            color = "green" if verdict in ["AC", "PE"] else "red" if verdict in ["WA", "TLE", "CE"] else "yellow"
             console.print(f"[{color}]Final Verdict: {verdict}[/{color}]")
         else:
             console.print(f"[red]Status: FAILED - {results.get('error', 'Unknown error')}[/red]")

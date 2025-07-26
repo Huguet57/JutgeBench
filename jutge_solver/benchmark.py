@@ -67,7 +67,7 @@ class BenchmarkResult:
             "tokens_used": self.tokens_used,
             "error": self.error,
             "language": self.language,
-            "success": self.verdict == "AC",
+            "success": self.verdict in ["AC", "PE"],
             "solution_code": self.solution_code,  # Add the generated code for debugging
             "submission_details": self.submission_details,  # Compiler output, test results, etc.
             "timestamp": datetime.now().isoformat()
@@ -301,7 +301,7 @@ def benchmark_single_problem(model_config: AIModelConfig, problem_id: str, jutge
                 except Exception as e:
                     logger.debug(f"Could not fetch submission details: {e}")
                 
-                if verdict == "AC":
+                if verdict in ["AC", "PE"]:
                     break
                     
             except Exception as e:
@@ -573,7 +573,7 @@ class AIModelBenchmark:
                         verdict = self._wait_for_verdict(problem_id, submission_id)
                         result.verdict = verdict
                         
-                        if verdict == "AC":
+                        if verdict in ["AC", "PE"]:
                             break
                             
                     except Exception as e:
@@ -631,7 +631,7 @@ class AIModelBenchmark:
             stats["total_time"] += result.total_time
             stats["total_tokens"] += result.tokens_used
             
-            if result.verdict == "AC":
+            if result.verdict in ["AC", "PE"]:
                 stats["solved"] += 1
             elif result.error:
                 stats["errors"] += 1
