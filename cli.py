@@ -1037,16 +1037,22 @@ def generate_html_report(results: dict):
                 """
                 
                 # Solution code section - make it prominent
-                if solution_code:
+                # Check for solution_code first, then fall back to code field (for Format Error cases)
+                code_to_display = solution_code or result.get('code', '')
+                if code_to_display:
                     code_id = f"{model_id}{problem_id}code".replace('_', '').replace('-', '')
+                    # Add a note if this code failed due to format issues
+                    code_header = "💡 Generated Solution"
+                    if not solution_code and result.get('error') == 'Format Error':
+                        code_header = "⚠️ Generated Code (Format Error)"
                     html_content += f"""
                         <div class="solution-section">
                             <div class="solution-header">
-                                <h5>💡 Generated Solution</h5>
+                                <h5>{code_header}</h5>
                                 <button class="copy-btn" onclick="copyCode('{code_id}')">📋 Copy</button>
                             </div>
                             <div class="solution-code" id="{code_id}">
-                                <pre><code>{solution_code}</code></pre>
+                                <pre><code>{code_to_display}</code></pre>
                             </div>
                         </div>
                     """
