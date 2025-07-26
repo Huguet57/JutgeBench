@@ -242,9 +242,10 @@ PYTHON SPECIFIC:
 - Be careful with integer division (use // for floor division)
 - Use print() with appropriate separators and end parameters to match exact format
 - Example: print(a, b, c) for space-separated vs print(f"({a},{b},{c})") for parentheses format
-- CRITICAL: Do NOT use 'return' statements outside of functions - this causes SyntaxError
+- CRITICAL: NEVER use 'return' statements outside of functions - this causes SyntaxError
 - Write main execution code at the top level, not inside functions unless specifically needed
 - If you must use functions, ensure all code paths are properly structured
+- IMPORTANT: If using early exit logic, use sys.exit() or conditional blocks, NOT return
 """
         elif compiler_id in ["G++17", "G++"]:
             return base_prompt + """
@@ -315,7 +316,7 @@ Write your {language_name} solution below:"""
         
         language_name = self._get_language_name(compiler_id)
         
-        return f"""You are an expert competitive programming assistant. Your task is to analyze programming problems and develop solutions.
+        base_step1_prompt = f"""You are an expert competitive programming assistant. Your task is to analyze programming problems and develop solutions.
 
 This is STEP 1 of a two-step process. In this step, you should:
 
@@ -333,6 +334,16 @@ Be thorough in your analysis and explanation. You can include:
 Focus on correctness and completeness. Don't worry about exact formatting in this step - that will be handled in step 2.
 
 Target language: {language_name}"""
+
+        if compiler_id == "Python3":
+            return base_step1_prompt + """
+
+IMPORTANT PYTHON CONSTRAINTS:
+- NEVER use 'return' statements outside of functions - this causes SyntaxError
+- If you need early exit logic, use sys.exit() or conditional blocks instead
+- Write main execution code at the top level, not inside functions unless necessary"""
+        
+        return base_step1_prompt
 
     def _get_step2_system_prompt(self, compiler_id: str) -> str:
         """Get the system prompt for step 2: exact formatting"""
@@ -358,8 +369,10 @@ PYTHON SPECIFIC:
 - Read input using input() function
 - Print output using print() function
 - Match output format exactly as specified in the problem
-- Do NOT use 'return' statements outside of functions
-- Write main execution code at the top level"""
+- CRITICAL: NEVER use 'return' statements outside of functions - this causes SyntaxError
+- If the previous response has 'return' outside functions, REMOVE it or replace with proper logic
+- Write main execution code at the top level
+- Use sys.exit() or conditional blocks for early exit, NOT return"""
 
         elif compiler_id in ["G++17", "G++"]:
             return base_prompt + """
