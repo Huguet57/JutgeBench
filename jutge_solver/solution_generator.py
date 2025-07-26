@@ -85,7 +85,7 @@ class SolutionGenerator:
             
             # STEP 2: Format the previous response to exact output requirements
             console.print(f"[blue]    Step 2: Formatting to exact requirements...[/blue]")
-            step2_prompt = self._create_step2_prompt(step1_raw_response, compiler_id)
+            step2_prompt = self._create_step2_prompt(step1_raw_response, compiler_id, problem_info)
             
             step2_response = self.client.chat.completions.create(
                 model=self.config.model,
@@ -352,16 +352,26 @@ IMPORTANT PYTHON CONSTRAINTS:
         
         base_prompt = """You are a code formatter that takes an AI-generated solution and formats it to exact submission requirements.
 
-CRITICAL: Your ONLY job is to extract and format the final code for submission. 
+CRITICAL: Your ONLY job is to extract and format the final code for submission.
 
-REQUIREMENTS:
+ABSOLUTE OUTPUT FORMAT REQUIREMENTS:
+- Study the test cases CAREFULLY - the "Expected Output" shows the EXACT format required
+- Your code output must match EXACTLY: spacing, punctuation, separators, newlines
+- Even ONE wrong character will cause WRONG verdict
+- Look at Expected Output patterns: "2 3 1" vs "(2,3,1)" vs "2,3,1" - match exactly
+- Count spaces, check for parentheses, commas, brackets - be precise
+
+CODE REQUIREMENTS:
 - Output ONLY the clean, executable code
-- NO explanations, comments, or text before/after the code
+- NO explanations, comments, or text before/after the code  
 - NO markdown formatting (no ```)
-- Match the exact output format requirements from the problem
 - Ensure the code is ready for direct submission to an online judge
+- The code should be complete and runnable as-is
 
-The code should be complete and runnable as-is."""
+FORMAT ANALYSIS REQUIRED:
+- Before writing code, analyze the Expected Output format in test cases
+- Identify exact patterns: space-separated, comma-separated, parentheses, etc.
+- Ensure your print statements match this format precisely"""
 
         if compiler_id == "Python3":
             return base_prompt + """
@@ -369,13 +379,17 @@ The code should be complete and runnable as-is."""
 PYTHON SPECIFIC:
 - Use Python 3 syntax
 - Read input using input() function
-- Print output using print() function
-- Match output format exactly as specified in the problem
-- CRITICAL: NEVER use 'return' statements outside of functions - this causes SyntaxError
+- CRITICAL FORMAT MATCHING: Your print() statements must produce EXACTLY the Expected Output format
+- Examples of precise formatting:
+  * For "2 3 1": use print(a, b, c) or print(f"{a} {b} {c}")
+  * For "(2,3,1)": use print(f"({a},{b},{c})")  
+  * For "2,3,1": use print(f"{a},{b},{c}")
+  * For multiple lines: use separate print() calls
+- NEVER use 'return' statements outside of functions - this causes SyntaxError
 - If the previous response has 'return' outside functions, REMOVE it and use conditional blocks instead
 - Write main execution code at the top level
 - Use if/elif/else conditional blocks or organize code in functions for control flow, NOT return
-- Restructure logic with proper conditional statements (if/elif/else)"""
+- Double-check your print statements match the Expected Output format character-by-character"""
 
         elif compiler_id in ["G++17", "G++"]:
             return base_prompt + """
@@ -414,17 +428,62 @@ Please provide:
 
 Be thorough in your analysis and make sure your solution handles all the test cases correctly."""
 
-    def _create_step2_prompt(self, step1_response: str, compiler_id: str) -> str:
+    def _create_step2_prompt(self, step1_response: str, compiler_id: str, problem_info: Dict[str, Any] = None) -> str:
         """Create prompt for step 2: exact formatting"""
         
         language_name = self._get_language_name(compiler_id)
         
-        return f"""Take the following AI-generated solution and extract ONLY the final {language_name} code for submission.
+        # Extract output format examples from test cases
+        format_examples = self._extract_output_format_examples(problem_info) if problem_info else ""
+        
+        base_prompt = f"""Take the following AI-generated solution and extract ONLY the final {language_name} code for submission.
+
+{format_examples}
 
 Previous response:
 {step1_response}
 
+CRITICAL: Study the Expected Output format above and ensure your code produces EXACTLY that format.
+
 Output ONLY the clean, executable {language_name} code with no explanations, comments, or formatting. The code should be ready for direct submission to an online judge."""
+        
+        return base_prompt
+    
+    def _extract_output_format_examples(self, problem_info: Dict[str, Any]) -> str:
+        """Extract output format examples from test cases to emphasize in step 2"""
+        if not problem_info:
+            return ""
+            
+        examples = []
+        
+        # Get sample test cases
+        sample_testcases = problem_info.get("sample_testcases", [])
+        for i, testcase in enumerate(sample_testcases[:3], 1):  # Limit to first 3
+            try:
+                input_data = base64.b64decode(testcase.get("input_b64", "")).decode('utf-8').strip()
+                expected_output = base64.b64decode(testcase.get("correct_b64", "")).decode('utf-8').strip()
+                examples.append(f"Example {i}: Input='{input_data}' → Expected Output='{expected_output}'")
+            except:
+                continue
+        
+        # Get public test cases if not enough samples
+        if len(examples) < 2:
+            public_testcases = problem_info.get("public_testcases", [])
+            for i, testcase in enumerate(public_testcases[:2], len(examples) + 1):
+                try:
+                    input_data = base64.b64decode(testcase.get("input_b64", "")).decode('utf-8').strip()
+                    expected_output = base64.b64decode(testcase.get("correct_b64", "")).decode('utf-8').strip()
+                    examples.append(f"Example {i}: Input='{input_data}' → Expected Output='{expected_output}'")
+                except:
+                    continue
+        
+        if examples:
+            return f"""OUTPUT FORMAT ANALYSIS - Study these examples CAREFULLY:
+{chr(10).join(examples)}
+
+NOTICE the exact format: spacing, punctuation, separators. Your code MUST produce this exact format.
+"""
+        return ""
     
     def _extract_code(self, response: str, compiler_id: str) -> Optional[str]:
         """Extract code from OpenAI response"""
