@@ -385,11 +385,27 @@ PYTHON SPECIFIC:
   * For "(2,3,1)": use print(f"({a},{b},{c})")  
   * For "2,3,1": use print(f"{a},{b},{c}")
   * For multiple lines: use separate print() calls
-- NEVER use 'return' statements outside of functions - this causes SyntaxError
-- If the previous response has 'return' outside functions, REMOVE it and use conditional blocks instead
+
+🚨 CRITICAL SYNTAX FIXING REQUIRED:
+- MANDATORY: Scan step 1 response for 'return' statements outside functions
+- If found, you MUST remove them and restructure the code properly
+- Replace return-based early exits with proper if/elif/else blocks
+- Transform code like this:
+  
+  ❌ BROKEN (causes SyntaxError):
+  if n == 1:
+      print(1)
+      return
+  
+  ✅ FIXED (works correctly):
+  if n == 1:
+      print(1)
+  else:
+      # handle other cases
+
 - Write main execution code at the top level
-- Use if/elif/else conditional blocks or organize code in functions for control flow, NOT return
-- Double-check your print statements match the Expected Output format character-by-character"""
+- Double-check your print statements match the Expected Output format character-by-character
+- Your final code must be syntactically correct and executable"""
 
         elif compiler_id in ["G++17", "G++"]:
             return base_prompt + """
@@ -436,9 +452,16 @@ Be thorough in your analysis and make sure your solution handles all the test ca
         # Extract output format examples from test cases
         format_examples = self._extract_output_format_examples(problem_info) if problem_info else ""
         
+        # Detect problematic return statements for Python
+        return_issues = ""
+        if compiler_id == "Python3":
+            return_issues = self._detect_return_issues(step1_response)
+        
         base_prompt = f"""Take the following AI-generated solution and extract ONLY the final {language_name} code for submission.
 
 {format_examples}
+
+{return_issues}
 
 Previous response:
 {step1_response}
@@ -448,6 +471,102 @@ CRITICAL: Study the Expected Output format above and ensure your code produces E
 Output ONLY the clean, executable {language_name} code with no explanations, comments, or formatting. The code should be ready for direct submission to an online judge."""
         
         return base_prompt
+    
+    def _detect_return_issues(self, step1_response: str) -> str:
+        """Detect problematic return statements in step 1 response and provide fixing instructions"""
+        
+        # Extract potential code blocks from step1 response
+        code_blocks = []
+        
+        # Look for markdown code blocks
+        import re
+        markdown_pattern = r'```(?:python|py)?\n?(.*?)```'
+        matches = re.findall(markdown_pattern, step1_response, re.DOTALL | re.IGNORECASE)
+        code_blocks.extend(matches)
+        
+        # Also check the whole response for code-like content
+        lines = step1_response.split('\n')
+        potential_code = []
+        for line in lines:
+            stripped = line.strip()
+            if (stripped.startswith('def ') or stripped.startswith('if ') or 
+                stripped.startswith('for ') or stripped.startswith('while ') or
+                'print(' in stripped or stripped.startswith('return') or
+                '=' in stripped and not stripped.startswith('#')):
+                potential_code.append(line)
+        
+        if potential_code:
+            code_blocks.append('\n'.join(potential_code))
+        
+        # Check for problematic return statements
+        problematic_returns = []
+        for code_block in code_blocks:
+            lines = code_block.split('\n')
+            in_function = False
+            function_indent = 0
+            
+            for i, line in enumerate(lines, 1):
+                stripped = line.strip()
+                current_indent = len(line) - len(line.lstrip())
+                
+                # Track if we're inside a function
+                if stripped.startswith('def '):
+                    in_function = True
+                    function_indent = current_indent
+                elif in_function and stripped and current_indent <= function_indent:
+                    # We've left the function (dedent to same level or less)
+                    in_function = False
+                    function_indent = 0
+                
+                # Check for return statements
+                if 'return' in stripped:
+                    # Check if it's a standalone return or return at start of line
+                    is_return_statement = (stripped == 'return' or 
+                                         stripped.startswith('return ') or 
+                                         stripped.startswith('return#') or
+                                         stripped.endswith('return'))
+                    
+                    if is_return_statement and not in_function:
+                        problematic_returns.append({
+                            'line': i,
+                            'content': line,
+                            'context': lines[max(0, i-2):min(len(lines), i+2)]
+                        })
+        
+        if problematic_returns:
+            issue_description = "🚨 CRITICAL PYTHON SYNTAX ISSUE DETECTED:\n"
+            issue_description += "=" * 45 + "\n\n"
+            issue_description += f"Found {len(problematic_returns)} problematic 'return' statement(s) outside functions in step 1 response!\n\n"
+            
+            for i, issue in enumerate(problematic_returns, 1):
+                issue_description += f"Issue {i}:\n"
+                issue_description += f"  Line: {issue['line']}\n"
+                issue_description += f"  Code: {issue['content'].strip()}\n"
+                issue_description += f"  Context:\n"
+                for ctx_line in issue['context']:
+                    issue_description += f"    {ctx_line}\n"
+                issue_description += "\n"
+            
+            issue_description += "MANDATORY FIXES REQUIRED:\n"
+            issue_description += "✓ REMOVE all 'return' statements outside functions\n"
+            issue_description += "✓ Replace with proper if/elif/else conditional blocks\n"
+            issue_description += "✓ Use function organization if complex logic needed\n"
+            issue_description += "✓ Ensure main execution code is at top level\n\n"
+            issue_description += "EXAMPLE FIXES:\n"
+            issue_description += "❌ BAD:\n"
+            issue_description += "   if condition:\n"
+            issue_description += "       print('result')\n"
+            issue_description += "       return  # SYNTAX ERROR!\n"
+            issue_description += "\n"
+            issue_description += "✅ GOOD:\n"
+            issue_description += "   if condition:\n"
+            issue_description += "       print('result')\n"
+            issue_description += "   else:\n"
+            issue_description += "       # handle other cases\n\n"
+            
+            return issue_description
+        
+        return ""
     
     def _extract_output_format_examples(self, problem_info: Dict[str, Any]) -> str:
         """Extract structured output format analysis from test cases for step 2"""
