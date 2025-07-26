@@ -244,7 +244,7 @@ problem_sets:
     - "P98960_en"   # Uppercase and lowercase letters
 
   one_problem:
-    - "P53046_ca"   # De un a ena (2)
+    - "P69277_en"   # First cubes
 
   custom_problems:
     - "P98960_en"   # Uppercase and lowercase letters
