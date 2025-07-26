@@ -247,9 +247,9 @@ problem_sets:
     - "P30170_en"   # Repeated words
 
   custom_problems:
-    - "P98960_en"   # Uppercase and lowercase letters
-    - "P61634_en"   # Leap years
-    - "P42042_en"   # Classification of characters (1)
+    - "P30170_en"
+    - "P70093_en"
+    - "P12284_en"
 
   learning_to_program_1:
     - "P68688_en"
