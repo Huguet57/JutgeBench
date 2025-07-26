@@ -303,7 +303,7 @@ def benchmark_single_problem(model_config: AIModelConfig, problem_id: str, jutge
                 except Exception as e:
                     logger.debug(f"Could not fetch submission details: {e}")
                 
-                if verdict in self.jutge_config.solver.accepted_verdicts:
+                if verdict in jutge_config.solver.accepted_verdicts:
                     break
                     
             except Exception as e:
