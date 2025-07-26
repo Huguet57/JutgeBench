@@ -45,7 +45,7 @@ models:
     model_id: "google/gemini-2.5-pro"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 32000
+    max_tokens: 64000
     temperature: 0.1
     timeout: 30
     enabled: true
