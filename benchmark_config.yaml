@@ -244,7 +244,7 @@ problem_sets:
     - "P98960_en"   # Uppercase and lowercase letters
 
   one_problem:
-    - "P90226_en"   # Comparison of words
+    - "P53046_ca"   # De un a ena (2)
 
   custom_problems:
     - "P98960_en"   # Uppercase and lowercase letters
@@ -258,4 +258,9 @@ retry_on_failure: true
 max_retries: 2
 save_detailed_logs: true
 output_format: "json"  # "json", "csv", "html"
-parallel_strategy: "full"  # "full", "models", "sequential" 
+parallel_strategy: "full"  # "full", "models", "sequential"
+
+# Raw response logging for debugging (helps analyze extraction failures like Gemini 2.5 Pro)
+save_raw_responses: true  # Enable to save AI responses for debugging
+raw_responses_dir: "results/raw_responses"  # Directory to save raw responses
+save_raw_on_failure_only: false  # Set to true to only save when extraction/execution fails 

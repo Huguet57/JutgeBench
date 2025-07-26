@@ -34,6 +34,11 @@ class BenchmarkConfig(BaseModel):
     output_format: str = "json"  # "json", "csv", "html"
     parallel_strategy: str = "full"  # "full", "models", "sequential"
     
+    # Raw response logging configuration
+    save_raw_responses: bool = True  # Enable raw response logging for debugging
+    raw_responses_dir: str = "results/raw_responses"  # Directory to save raw responses
+    save_raw_on_failure_only: bool = False  # Only save raw responses when extraction/execution fails
+    
     @classmethod
     def create_default(cls) -> "BenchmarkConfig":
         """Create default benchmark configuration with common AI models"""

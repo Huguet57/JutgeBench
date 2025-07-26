@@ -5,6 +5,7 @@ Solution generation module using OpenAI API
 import re
 import base64
 import logging
+import os
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
@@ -17,9 +18,10 @@ logger = logging.getLogger(__name__)
 class SolutionGenerator:
     """Generates programming solutions using OpenAI API"""
     
-    def __init__(self, openai_client, openai_config):
+    def __init__(self, openai_client, openai_config, raw_logging_config=None):
         self.client = openai_client
         self.config = openai_config
+        self.raw_logging_config = raw_logging_config or {}
         
         # Language-specific settings
         self.language_settings = {
@@ -81,10 +83,21 @@ class SolutionGenerator:
             
             # Extract code from response
             raw_response = response.choices[0].message.content
-            code = self._extract_code(raw_response, compiler_id)
             
-            if not code:
-                raise ValueError("No code found in OpenAI response")
+            # Save raw response for debugging if enabled
+            extraction_failed = False
+            try:
+                code = self._extract_code(raw_response, compiler_id)
+                if not code:
+                    extraction_failed = True
+                    raise ValueError("No code found in OpenAI response")
+            except Exception as e:
+                extraction_failed = True
+                self._save_raw_response_on_failure(raw_response, problem_info, compiler_id, attempt, "extraction_failed", str(e))
+                raise
+            
+            # Save raw response if logging is enabled (success case)
+            self._save_raw_response(raw_response, problem_info, compiler_id, attempt, "success")
             
             result = {
                 "success": True,
@@ -488,3 +501,104 @@ Write your {language_name} solution below:"""
             clean_response = re.sub(pattern, '', clean_response, flags=re.IGNORECASE)
         
         return clean_response.strip()
+    
+    def _save_raw_response(self, raw_response: str, problem_info: Dict[str, Any], compiler_id: str, attempt: int, status: str = "success") -> None:
+        """Save raw AI response to file for debugging purposes"""
+        if not self.raw_logging_config.get('save_raw_responses', False):
+            return
+        
+        # Only save on failure if that option is enabled
+        if self.raw_logging_config.get('save_raw_on_failure_only', False) and status == "success":
+            return
+            
+        try:
+            # Create directory if it doesn't exist
+            raw_responses_dir = self.raw_logging_config.get('raw_responses_dir', 'results/raw_responses')
+            os.makedirs(raw_responses_dir, exist_ok=True)
+            
+            # Generate filename
+            problem_id = problem_info.get('problem_id', 'unknown_problem')
+            model_name = getattr(self.config, 'model', 'unknown_model').replace('/', '_').replace(':', '_')
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            filename = f"{model_name}_{problem_id}_attempt{attempt}_{status}_{timestamp}.txt"
+            filepath = os.path.join(raw_responses_dir, filename)
+            
+            # Save response with metadata
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write("="*80 + "\n")
+                f.write(f"RAW AI RESPONSE DEBUG LOG\n")
+                f.write("="*80 + "\n")
+                f.write(f"Model: {getattr(self.config, 'model', 'unknown')}\n")
+                f.write(f"Problem ID: {problem_id}\n")
+                f.write(f"Compiler: {compiler_id}\n")
+                f.write(f"Attempt: {attempt}\n")
+                f.write(f"Status: {status}\n")
+                f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+                f.write(f"Response Length: {len(raw_response)} characters\n")
+                f.write("="*80 + "\n\n")
+                f.write("RAW RESPONSE:\n")
+                f.write("-"*40 + "\n")
+                f.write(raw_response)
+                f.write("\n" + "-"*40 + "\n")
+            
+            logger.info(f"Raw response saved to: {filepath}")
+            
+        except Exception as e:
+            logger.error(f"Failed to save raw response: {e}")
+    
+    def _save_raw_response_on_failure(self, raw_response: str, problem_info: Dict[str, Any], compiler_id: str, attempt: int, failure_type: str, error_msg: str) -> None:
+        """Save raw response when there's a failure (extraction, generation, etc.)"""
+        if not self.raw_logging_config.get('save_raw_responses', False):
+            return
+            
+        try:
+            # Create directory if it doesn't exist
+            raw_responses_dir = self.raw_logging_config.get('raw_responses_dir', 'results/raw_responses')
+            os.makedirs(raw_responses_dir, exist_ok=True)
+            
+            # Generate filename
+            problem_id = problem_info.get('problem_id', 'unknown_problem')
+            model_name = getattr(self.config, 'model', 'unknown_model').replace('/', '_').replace(':', '_')
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            filename = f"{model_name}_{problem_id}_attempt{attempt}_FAILED_{failure_type}_{timestamp}.txt"
+            filepath = os.path.join(raw_responses_dir, filename)
+            
+            # Save response with failure details
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write("="*80 + "\n")
+                f.write(f"RAW AI RESPONSE DEBUG LOG - FAILURE\n")
+                f.write("="*80 + "\n")
+                f.write(f"Model: {getattr(self.config, 'model', 'unknown')}\n")
+                f.write(f"Problem ID: {problem_id}\n")
+                f.write(f"Compiler: {compiler_id}\n")
+                f.write(f"Attempt: {attempt}\n")
+                f.write(f"Failure Type: {failure_type}\n")
+                f.write(f"Error Message: {error_msg}\n")
+                f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+                f.write(f"Response Length: {len(raw_response)} characters\n")
+                f.write("="*80 + "\n\n")
+                f.write("RAW RESPONSE:\n")
+                f.write("-"*40 + "\n")
+                f.write(raw_response)
+                f.write("\n" + "-"*40 + "\n")
+                
+                # Add extraction analysis for debugging
+                if failure_type == "extraction_failed":
+                    f.write("\nEXTRACTION ANALYSIS:\n")
+                    f.write("-"*40 + "\n")
+                    f.write(f"Response contains triple backticks: {'```' in raw_response}\n")
+                    f.write(f"Response contains 'def ': {'def ' in raw_response}\n")
+                    f.write(f"Response contains 'import ': {'import ' in raw_response}\n")
+                    f.write(f"Response contains 'print(': {'print(' in raw_response}\n")
+                    f.write(f"Response contains common code patterns: {any(pattern in raw_response for pattern in ['=', '{', '}', '(', ')', ';'])}\n")
+                    
+                    # Show first and last 200 characters for pattern analysis
+                    f.write(f"\nFirst 200 characters:\n{repr(raw_response[:200])}\n")
+                    f.write(f"\nLast 200 characters:\n{repr(raw_response[-200:])}\n")
+            
+            logger.warning(f"Raw response saved due to {failure_type}: {filepath}")
+            
+        except Exception as e:
+            logger.error(f"Failed to save raw response on failure: {e}")

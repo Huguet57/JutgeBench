@@ -44,7 +44,13 @@ class JutgeProblemSolver:
             base_url=self.config.openai.base_url,
         )
         self.problem_analyzer = ProblemAnalyzer(self.jutge_client)
-        self.solution_generator = SolutionGenerator(self.openai_client, self.config.openai)
+        # Raw logging config for debugging AI responses  
+        raw_logging_config = {
+            'save_raw_responses': getattr(self.config.solver, 'save_raw_responses', False),
+            'raw_responses_dir': getattr(self.config.solver, 'raw_responses_dir', 'results/raw_responses'),
+            'save_raw_on_failure_only': getattr(self.config.solver, 'save_raw_on_failure_only', False)
+        }
+        self.solution_generator = SolutionGenerator(self.openai_client, self.config.openai, raw_logging_config)
         self.verdict_manager = VerdictManager(self.jutge_client, self.config.jutge)
         
         self._authenticated = False

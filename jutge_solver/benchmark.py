@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_compl
 import logging
 import multiprocessing as mp
 
+import openai
 from openai import OpenAI
 
 # Optional imports for other AI providers
@@ -190,12 +191,29 @@ Generate only the code solution without any explanation or markdown formatting.
 
 
 def benchmark_single_problem(model_config: AIModelConfig, problem_id: str, jutge_config: Config, 
-                            max_attempts: int, logger_name: str) -> BenchmarkResult:
+                            max_attempts: int, logger_name: str, raw_logging_config: Dict[str, Any] = None) -> BenchmarkResult:
     """Benchmark a single problem with a single model - designed for parallel execution"""
     # Create fresh instances for this worker
     jutge_client = JutgeApiClient()
     jutge_client.login(jutge_config.jutge.email, jutge_config.jutge.password)
     problem_analyzer = ProblemAnalyzer(jutge_client)
+    
+    # Create SolutionGenerator with raw logging config for this specific model
+    openai_client = openai.OpenAI(
+        api_key=model_config.api_key,
+        base_url=model_config.base_url or "https://openrouter.ai/api/v1"
+    )
+    
+    # Mock openai config for SolutionGenerator (it only uses model, max_tokens, temperature, timeout)
+    class MockOpenAIConfig:
+        def __init__(self, model_config):
+            self.model = model_config.model_id
+            self.max_tokens = model_config.max_tokens
+            self.temperature = model_config.temperature
+            self.timeout = model_config.timeout
+    
+    solution_generator = SolutionGenerator(openai_client, MockOpenAIConfig(model_config), raw_logging_config or {})
+    
     adapter = AIModelAdapter(model_config)
     
     # Setup logger for this worker
@@ -216,10 +234,16 @@ def benchmark_single_problem(model_config: AIModelConfig, problem_id: str, jutge
             result.attempts = attempt + 1
             
             try:
-                # Generate solution
-                solution, tokens, gen_time = adapter.generate_solution(problem_data, "Python3")
-                result.solution_code = solution
-                result.tokens_used = tokens
+                # Generate solution using SolutionGenerator (with raw response logging)
+                start_time = time.time()
+                generation_result = solution_generator.generate_solution(problem_data, "Python3", attempt + 1)
+                gen_time = time.time() - start_time
+                
+                if not generation_result.get("success"):
+                    raise Exception(f"Solution generation failed: {generation_result.get('error', 'Unknown error')}")
+                
+                result.solution_code = generation_result["code"]
+                result.tokens_used = generation_result["token_usage"]["total_tokens"]
                 result.generation_time = gen_time
                 result.language = "Python3"
                 
@@ -426,13 +450,21 @@ class AIModelBenchmark:
             # Submit all tasks
             future_to_task = {}
             for model_config, problem_id in tasks:
+                # Raw logging config from benchmark config
+                raw_logging_config = {
+                    'save_raw_responses': self.benchmark_config.save_raw_responses,
+                    'raw_responses_dir': self.benchmark_config.raw_responses_dir,
+                    'save_raw_on_failure_only': self.benchmark_config.save_raw_on_failure_only
+                }
+                
                 future = executor.submit(
                     benchmark_single_problem,
                     model_config,
                     problem_id,
                     self.jutge_config,
                     self.benchmark_config.max_attempts_per_problem,
-                    f"benchmark.{model_config.name}"
+                    f"benchmark.{model_config.name}",
+                    raw_logging_config
                 )
                 future_to_task[future] = (model_config.name, problem_id)
             
@@ -465,13 +497,21 @@ class AIModelBenchmark:
             # Submit all problems for this model
             future_to_problem = {}
             for problem_id in problem_ids:
+                # Raw logging config from benchmark config
+                raw_logging_config = {
+                    'save_raw_responses': self.benchmark_config.save_raw_responses,
+                    'raw_responses_dir': self.benchmark_config.raw_responses_dir,
+                    'save_raw_on_failure_only': self.benchmark_config.save_raw_on_failure_only
+                }
+                
                 future = executor.submit(
                     benchmark_single_problem,
                     model_config,
                     problem_id,
                     self.jutge_config,
                     self.benchmark_config.max_attempts_per_problem,
-                    f"benchmark.{model_config.name}"
+                    f"benchmark.{model_config.name}",
+                    raw_logging_config
                 )
                 future_to_problem[future] = problem_id
             
