@@ -5,7 +5,7 @@ models:
     model_id: "anthropic/claude-sonnet-4"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -15,7 +15,7 @@ models:
     model_id: "google/gemini-2.0-flash-001"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -25,7 +25,7 @@ models:
     model_id: "google/gemini-2.5-flash"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -35,7 +35,7 @@ models:
     model_id: "deepseek/deepseek-chat-v3-0324:free"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -45,7 +45,7 @@ models:
     model_id: "google/gemini-2.5-pro"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -55,7 +55,7 @@ models:
     model_id: "google/gemini-2.5-flash-preview-05-20"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -65,7 +65,7 @@ models:
     model_id: "deepseek/deepseek-chat-v3-0324"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -75,7 +75,7 @@ models:
     model_id: "anthropic/claude-3.7-sonnet"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -85,7 +85,7 @@ models:
     model_id: "google/gemini-2.5-flash-lite-preview-06-17"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -95,7 +95,7 @@ models:
     model_id: "deepseek/deepseek-r1-0528:free"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -105,7 +105,7 @@ models:
     model_id: "openai/gpt-4o-mini"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -115,7 +115,7 @@ models:
     model_id: "mistralai/mistral-nemo"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -125,7 +125,7 @@ models:
     model_id: "google/gemini-2.5-flash-preview"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -135,7 +135,7 @@ models:
     model_id: "openai/gpt-4.1"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -145,7 +145,7 @@ models:
     model_id: "deepseek/deepseek-r1:free"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -155,7 +155,7 @@ models:
     model_id: "openai/gpt-4.1-mini"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -165,7 +165,7 @@ models:
     model_id: "google/gemini-2.0-flash-lite-001"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -175,7 +175,7 @@ models:
     model_id: "meta-llama/llama-3.3-70b-instruct"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -185,7 +185,7 @@ models:
     model_id: "meta-llama/llama-4-maverick"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
@@ -195,7 +195,7 @@ models:
     model_id: "anthropic/claude-opus-4"
     api_key: null  # Will use OPENROUTER_API_KEY environment variable
     base_url: "https://openrouter.ai/api/v1"
-    max_tokens: 2000
+    max_tokens: 32000
     temperature: 0.1
     timeout: 30
     enabled: true
