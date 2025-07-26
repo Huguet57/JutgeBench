@@ -299,7 +299,7 @@ CRITICAL: If you don't include BOTH input reading AND print statements, your sol
 C++ SPECIFIC REQUIREMENTS:
 - Use standard competitive programming includes: #include <iostream> and others as needed
 - MANDATORY: Include proper main() function
-- MANDATORY: Read input using std::cin, scanf, or similar - NEVER assume variables exist
+- MANDATORY: Read input using std::cin, getline, scanf, or similar - NEVER assume variables exist
 - MANDATORY: Print output using std::cout, printf, or similar - match format exactly as shown in Expected Output
 - MANDATORY: Use the EXACT template structure shown below - DO NOT deviate from this format
 - Pay attention to spacing and separators: cout << a << " " << b for space-separated vs cout << "(" << a << "," << b << "," << c << ")" for parentheses format
@@ -308,7 +308,7 @@ C++ SPECIFIC REQUIREMENTS:
 ✅ #include <iostream> (and other necessary headers)
 ✅ using namespace std; statement
 ✅ int main() function definition 
-✅ Input reading inside main (cin >> variables)
+✅ Input reading inside main (cin >> variables or getline)
 ✅ Algorithm implementation
 ✅ Output printing (cout << result)
 ✅ return 0; statement
@@ -756,7 +756,7 @@ If step 1 response is missing critical components, ADD THEM:
 
 Missing template structure? REFORMAT to match the exact template above
 Missing input reading? ADD:
-- cin >> variable; statements inside main()
+- cin >> variable; or getline(cin, variable); statements inside main()
 - Proper variable declarations
 
 Missing output printing? ADD:  
@@ -931,7 +931,7 @@ Output ONLY the clean, executable {language_name} code with no explanations, com
             input_patterns = ['input()', 'input().split()', 'map(int, input().split())', 'int(input())']
             input_found = any(pattern in step1_response for pattern in input_patterns)
         elif compiler_id in ["G++17", "G++"]:
-            input_patterns = ['cin >>', 'scanf(', 'getline(']
+            input_patterns = ['cin >>', 'scanf(', 'getline(', 'getline (']
             input_found = any(pattern in step1_response for pattern in input_patterns)
         elif compiler_id == "JDK":
             input_patterns = ['Scanner', 'nextInt()', 'nextLine()', 'BufferedReader']
@@ -981,7 +981,7 @@ Output ONLY the clean, executable {language_name} code with no explanations, com
             if compiler_id == "Python3":
                 issue_description += "   MUST ADD: input(), input().split(), map(int, input().split()), etc.\n"
             elif compiler_id in ["G++17", "G++"]:
-                issue_description += "   MUST ADD: cin >> variable; statements\n"
+                issue_description += "   MUST ADD: cin >> variable; or getline(cin, variable); statements\n"
             elif compiler_id == "JDK":
                 issue_description += "   MUST ADD: Scanner scanner = new Scanner(System.in); and reading methods\n"
             issue_description += "\n"
@@ -1358,8 +1358,8 @@ Output ONLY the clean, executable {language_name} code with no explanations, com
         if 'return 0;' not in code and 'return 0 ;' not in normalized_code:
             template_issues.append("Missing required 'return 0;' statement")
         
-        # Check for basic input/output patterns (cin/cout)
-        has_input = any(pattern in code for pattern in ['cin >>', 'cin>>', 'std::cin >>', 'std::cin>>'])
+        # Check for basic input/output patterns (cin/cout/getline)
+        has_input = any(pattern in code for pattern in ['cin >>', 'cin>>', 'std::cin >>', 'std::cin>>', 'getline(', 'getline ('])
         has_output = any(pattern in code for pattern in ['cout <<', 'cout<<', 'std::cout <<', 'std::cout<<'])
         
         if not has_input:
