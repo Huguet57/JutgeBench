@@ -1323,8 +1323,8 @@ Output ONLY the clean, executable {language_name} code with no explanations, com
         """
         Validate that C++ code follows the required template structure:
         #include <iostream>
-        using namespace std;
         int main() { ... return 0; }
+        Note: using namespace std; is optional
         """
         if not code or not isinstance(code, str):
             console.print("[red]  ✗ Template validation failed: Code is empty or invalid[/red]")
@@ -1339,10 +1339,6 @@ Output ONLY the clean, executable {language_name} code with no explanations, com
         # Check for required includes
         if '#include <iostream>' not in code and '#include<iostream>' not in normalized_code:
             template_issues.append("Missing required '#include <iostream>'")
-        
-        # Check for using namespace std
-        if 'using namespace std;' not in code and 'using namespace std ;' not in normalized_code:
-            template_issues.append("Missing required 'using namespace std;'")
         
         # Check for main function
         main_found = False
@@ -1371,24 +1367,13 @@ Output ONLY the clean, executable {language_name} code with no explanations, com
         # Check overall structure order
         structure_valid = True
         include_pos = -1
-        using_pos = -1
         main_pos = -1
         
         for i, line in enumerate(lines):
             if '#include' in line and 'iostream' in line:
                 include_pos = i
-            elif 'using namespace std' in line:
-                using_pos = i
             elif 'int main(' in line:
                 main_pos = i
-        
-        if include_pos >= 0 and using_pos >= 0 and include_pos > using_pos:
-            structure_valid = False
-            template_issues.append("Template structure error: #include should come before using namespace")
-        
-        if using_pos >= 0 and main_pos >= 0 and using_pos > main_pos:
-            structure_valid = False
-            template_issues.append("Template structure error: using namespace should come before main function")
         
         if template_issues:
             console.print(f"[red]  ✗ C++ Template validation failed:[/red]")
