@@ -184,7 +184,13 @@ class SolutionGenerator:
         
         base_prompt = """You are an expert competitive programming assistant. Your task is to solve programming problems with clean, efficient, and correct code.
 
-IMPORTANT REQUIREMENTS:
+CRITICAL OUTPUT FORMAT REQUIREMENT:
+- Your program's output must match the expected output format EXACTLY - character by character
+- Pay extremely close attention to spacing, punctuation, commas, parentheses, and separators
+- Even one wrong character will result in a WRONG verdict
+- Study the "Expected Output" in test cases to see the precise format required
+
+CODE REQUIREMENTS:
 - Write ONLY the solution code, no explanations or comments
 - Output the raw code directly - DO NOT wrap in markdown blocks (no ```)
 - If you must use formatting, we will extract the code, but raw code is strongly preferred
@@ -198,8 +204,10 @@ IMPORTANT REQUIREMENTS:
 PYTHON SPECIFIC:
 - Use Python 3 syntax
 - Read input using input() function
-- Print output using print() function
+- Print output using print() function - match format exactly as shown in Expected Output
 - Be careful with integer division (use // for floor division)
+- Use print() with appropriate separators and end parameters to match exact format
+- Example: print(a, b, c) for space-separated vs print(f"({a},{b},{c})") for parentheses format
 """
         elif compiler_id in ["G++17", "G++"]:
             return base_prompt + """
@@ -207,7 +215,8 @@ PYTHON SPECIFIC:
 C++ SPECIFIC:
 - Use standard competitive programming includes: #include <iostream> and others as needed
 - Include proper main() function
-- Use std::'s cin/cout for input/output
+- Use std::cin/cout for input/output - match format exactly as shown in Expected Output
+- Pay attention to spacing and separators: cout << a << " " << b for space-separated vs cout << "(" << a << "," << b << "," << c << ")" for parentheses format
 """
 
         elif compiler_id == "JDK":
@@ -217,7 +226,8 @@ JAVA SPECIFIC:
 - Create a public class named 'Main'
 - Include proper main method: public static void main(String[] args)
 - Use Scanner for input or BufferedReader for faster input
-- System.out.println() for output
+- System.out.println() or System.out.print() for output - match format exactly as shown in Expected Output
+- Pay attention to spacing and separators: System.out.println(a + " " + b) for space-separated vs System.out.println("(" + a + "," + b + "," + c + ")") for parentheses format
 - Be careful with data types and overflow"""
 
         else:
@@ -232,7 +242,16 @@ JAVA SPECIFIC:
 
 {problem_statement}
 
-Requirements:
+CRITICAL OUTPUT FORMAT Requirements:
+- Your output must match the expected output format EXACTLY - character by character
+- Pay close attention to the "Expected Output" examples in the test cases above
+- Match spacing, punctuation, parentheses, commas, and separators exactly as shown
+- For example: if expected output shows "2 3 1", output exactly "2 3 1" (NOT "(2,3,1)" or "2,3,1")
+- If expected output shows "(2,3,1)", output exactly "(2,3,1)" (NOT "2 3 1" or "2,3,1")
+- Even a single character difference will cause your solution to be marked as WRONG
+- The sample and public test cases show the EXACT format required
+
+Code Requirements:
 - Provide only the complete, runnable code
 - Output raw code directly (no markdown formatting, no ```)
 - No explanations, comments, or text before/after the code
