@@ -257,7 +257,7 @@ def benchmark_single_problem(model_config: AIModelConfig, problem_id: str, jutge
                         submission_id = jutge_client.student.submissions.submit(
                             problem_id, 
                             "Python3",
-                            solution,
+                            result.solution_code,
                             f"Benchmark test by {model_config.name}"
                         )
                         result.submission_time = time.time() - submission_start
