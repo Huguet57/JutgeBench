@@ -450,11 +450,11 @@ Output ONLY the clean, executable {language_name} code with no explanations, com
         return base_prompt
     
     def _extract_output_format_examples(self, problem_info: Dict[str, Any]) -> str:
-        """Extract output format examples from test cases to emphasize in step 2"""
+        """Extract structured output format analysis from test cases for step 2"""
         if not problem_info:
             return ""
             
-        examples = []
+        test_cases = []
         
         # Get sample test cases
         sample_testcases = problem_info.get("sample_testcases", [])
@@ -462,28 +462,134 @@ Output ONLY the clean, executable {language_name} code with no explanations, com
             try:
                 input_data = base64.b64decode(testcase.get("input_b64", "")).decode('utf-8').strip()
                 expected_output = base64.b64decode(testcase.get("correct_b64", "")).decode('utf-8').strip()
-                examples.append(f"Example {i}: Input='{input_data}' → Expected Output='{expected_output}'")
+                test_cases.append((input_data, expected_output))
             except:
                 continue
         
         # Get public test cases if not enough samples
-        if len(examples) < 2:
+        if len(test_cases) < 2:
             public_testcases = problem_info.get("public_testcases", [])
-            for i, testcase in enumerate(public_testcases[:2], len(examples) + 1):
+            for testcase in public_testcases[:2]:
                 try:
                     input_data = base64.b64decode(testcase.get("input_b64", "")).decode('utf-8').strip()
                     expected_output = base64.b64decode(testcase.get("correct_b64", "")).decode('utf-8').strip()
-                    examples.append(f"Example {i}: Input='{input_data}' → Expected Output='{expected_output}'")
+                    test_cases.append((input_data, expected_output))
                 except:
                     continue
         
-        if examples:
-            return f"""OUTPUT FORMAT ANALYSIS - Study these examples CAREFULLY:
-{chr(10).join(examples)}
-
-NOTICE the exact format: spacing, punctuation, separators. Your code MUST produce this exact format.
-"""
-        return ""
+        if not test_cases:
+            return ""
+        
+        # Analyze format patterns
+        format_analysis = self._analyze_output_patterns(test_cases)
+        
+        # Build structured format guide
+        format_guide = "🎯 CRITICAL OUTPUT FORMAT REQUIREMENTS:\n"
+        format_guide += "=" * 50 + "\n\n"
+        
+        # Show test cases with detailed analysis
+        format_guide += "📋 TEST CASE ANALYSIS:\n"
+        for i, (input_data, expected_output) in enumerate(test_cases, 1):
+            format_guide += f"  Case {i}:\n"
+            format_guide += f"    Input:  '{input_data}'\n"
+            format_guide += f"    Output: '{expected_output}'\n"
+            format_guide += f"    Length: {len(expected_output)} characters\n"
+            if '\n' in expected_output:
+                lines = expected_output.split('\n')
+                format_guide += f"    Lines:  {len(lines)} lines\n"
+                for j, line in enumerate(lines, 1):
+                    format_guide += f"      Line {j}: '{line}' ({len(line)} chars)\n"
+            format_guide += "\n"
+        
+        # Add pattern analysis
+        format_guide += "🔍 FORMAT PATTERN ANALYSIS:\n"
+        format_guide += format_analysis + "\n"
+        
+        # Add specific Python code instructions
+        format_guide += "💻 EXACT PYTHON IMPLEMENTATION REQUIRED:\n"
+        python_code = self._generate_python_format_code(test_cases)
+        format_guide += python_code + "\n"
+        
+        format_guide += "⚠️  YOUR CODE MUST PRODUCE EXACTLY THE SAME OUTPUT - CHARACTER BY CHARACTER!\n"
+        
+        return format_guide
+    
+    def _analyze_output_patterns(self, test_cases: List[tuple]) -> str:
+        """Analyze output patterns to identify format requirements"""
+        if not test_cases:
+            return ""
+        
+        patterns = []
+        
+        # Check for common patterns
+        if all(' ' in output and ',' not in output and '(' not in output for _, output in test_cases):
+            patterns.append("✓ SPACE-SEPARATED format detected")
+            patterns.append("  Use: print(a, b, c) or print(f'{a} {b} {c}')")
+        
+        elif all('(' in output and ')' in output and ',' in output for _, output in test_cases):
+            patterns.append("✓ PARENTHESES WITH COMMAS format detected")
+            patterns.append("  Use: print(f'({a},{b},{c})')")
+        
+        elif all(',' in output and '(' not in output for _, output in test_cases):
+            patterns.append("✓ COMMA-SEPARATED format detected")
+            patterns.append("  Use: print(f'{a},{b},{c}')")
+        
+        # Check for multi-line output
+        if any('\n' in output for _, output in test_cases):
+            patterns.append("✓ MULTI-LINE output detected")
+            patterns.append("  Use: Multiple print() statements")
+        
+        # Check for specific characters
+        special_chars = set()
+        for _, output in test_cases:
+            for char in output:
+                if char not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 \n':
+                    special_chars.add(char)
+        
+        if special_chars:
+            patterns.append(f"✓ Special characters found: {', '.join(sorted(special_chars))}")
+            patterns.append("  Must include these exact characters in output")
+        
+        # Check for trailing newlines
+        has_trailing_newline = any(output.endswith('\n') for _, output in test_cases)
+        if has_trailing_newline:
+            patterns.append("✓ Trailing newline detected - use print() not print(..., end='')")
+        
+        return '\n'.join(patterns) if patterns else "Format pattern unclear - match examples exactly"
+    
+    def _generate_python_format_code(self, test_cases: List[tuple]) -> str:
+        """Generate specific Python code examples for the detected format"""
+        if not test_cases:
+            return ""
+        
+        first_output = test_cases[0][1]
+        
+        code_examples = []
+        
+        # Generate format-specific code
+        if ' ' in first_output and ',' not in first_output and '(' not in first_output:
+            # Space-separated
+            code_examples.append("# For space-separated output:")
+            code_examples.append("print(value1, value2, value3)  # Automatic spaces")
+            code_examples.append("# OR")
+            code_examples.append("print(f'{value1} {value2} {value3}')  # Manual spaces")
+        
+        elif '(' in first_output and ')' in first_output and ',' in first_output:
+            # Parentheses with commas
+            code_examples.append("# For parentheses with commas:")
+            code_examples.append("print(f'({value1},{value2},{value3})')")
+        
+        elif ',' in first_output and '(' not in first_output:
+            # Comma-separated
+            code_examples.append("# For comma-separated output:")
+            code_examples.append("print(f'{value1},{value2},{value3}')")
+        
+        if '\n' in first_output:
+            code_examples.append("# For multi-line output:")
+            code_examples.append("print('first line')")
+            code_examples.append("print('second line')")
+        
+        return '\n'.join(code_examples) if code_examples else "# Match the exact format shown above"
     
     def _extract_code(self, response: str, compiler_id: str) -> Optional[str]:
         """Extract code from OpenAI response"""
