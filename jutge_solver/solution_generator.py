@@ -117,9 +117,20 @@ class SolutionGenerator:
                 
                 # For C++ code, validate template compliance
                 if compiler_id in ["G++17", "G++"] and not self._validate_cpp_template(code):
-                    extraction_failed = True
+                    console.print("[red]  ✗ Generation failed: Generated C++ code does not follow required template structure[/red]")
+                    logger.warning(f"Template validation failed (attempt {attempt}): Generated C++ code does not follow required template structure")
                     self._save_raw_response_on_failure(final_raw_response, problem_info, compiler_id, attempt, "template_validation_failed", "Generated C++ code does not follow required template structure")
-                    raise ValueError("Generated C++ code does not follow required template structure")
+                    
+                    return {
+                        "success": False,
+                        "error": "Format Error",
+                        "error_details": "Generated C++ code does not follow required template structure",
+                        "compiler_id": compiler_id,
+                        "attempt": attempt,
+                        "timestamp": datetime.now().isoformat(),
+                        "error_type": "template_validation_failed",
+                        "code": code  # Include the code for debugging
+                    }
                     
             except Exception as e:
                 extraction_failed = True
