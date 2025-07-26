@@ -208,6 +208,9 @@ PYTHON SPECIFIC:
 - Be careful with integer division (use // for floor division)
 - Use print() with appropriate separators and end parameters to match exact format
 - Example: print(a, b, c) for space-separated vs print(f"({a},{b},{c})") for parentheses format
+- CRITICAL: Do NOT use 'return' statements outside of functions - this causes SyntaxError
+- Write main execution code at the top level, not inside functions unless specifically needed
+- If you must use functions, ensure all code paths are properly structured
 """
         elif compiler_id in ["G++17", "G++"]:
             return base_prompt + """
