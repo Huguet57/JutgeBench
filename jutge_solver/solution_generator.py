@@ -62,7 +62,7 @@ class SolutionGenerator:
             
             # STEP 1: Generate thoughts/process and initial code
             console.print(f"[blue]    Step 1: Generating approach and initial code...[/blue]")
-            step1_prompt = self._create_step1_prompt(problem_statement, compiler_id)
+            step1_prompt = self._create_step1_prompt(problem_statement, compiler_id, problem_info)
             
             step1_response = self.client.chat.completions.create(
                 model=self.config.model,
@@ -427,14 +427,21 @@ JAVA SPECIFIC:
 
         return base_prompt
 
-    def _create_step1_prompt(self, problem_statement: str, compiler_id: str) -> str:
+    def _create_step1_prompt(self, problem_statement: str, compiler_id: str, problem_info: Dict[str, Any] = None) -> str:
         """Create prompt for step 1: analysis and initial code generation"""
         
         language_name = self._get_language_name(compiler_id)
         
-        return f"""Analyze this competitive programming problem and develop a solution in {language_name}.
+        # Extract test case information to help with output format understanding
+        test_case_info = ""
+        if problem_info:
+            test_case_info = self._extract_test_cases_for_step1(problem_info)
+        
+        base_prompt = f"""Analyze this competitive programming problem and develop a solution in {language_name}.
 
 {problem_statement}
+
+{test_case_info}
 
 Please provide:
 1. Your understanding of the problem
@@ -442,7 +449,62 @@ Please provide:
 3. Any key insights or edge cases to consider
 4. The complete {language_name} solution
 
-Be thorough in your analysis and make sure your solution handles all the test cases correctly."""
+Be thorough in your analysis and make sure your solution handles all the test cases correctly and produces the exact output format shown in the examples."""
+        
+        return base_prompt
+
+    def _extract_test_cases_for_step1(self, problem_info: Dict[str, Any]) -> str:
+        """Extract test case information for step 1 to help understand the expected output format"""
+        if not problem_info:
+            return ""
+            
+        test_cases = []
+        
+        # Get sample test cases
+        sample_testcases = problem_info.get("sample_testcases", [])
+        for i, testcase in enumerate(sample_testcases[:3], 1):  # Limit to first 3
+            try:
+                import base64
+                # Handle both dict access and attribute access
+                if hasattr(testcase, 'input_b64'):
+                    input_data = base64.b64decode(testcase.input_b64).decode('utf-8').strip()
+                    expected_output = base64.b64decode(testcase.correct_b64).decode('utf-8').strip()
+                else:
+                    input_data = base64.b64decode(testcase.get("input_b64", "")).decode('utf-8').strip()
+                    expected_output = base64.b64decode(testcase.get("correct_b64", "")).decode('utf-8').strip()
+                
+                test_cases.append((input_data, expected_output, f"Sample {i}"))
+            except Exception as e:
+                continue
+        
+        # Get public test cases if not enough samples
+        if len(test_cases) < 2:
+            public_testcases = problem_info.get("public_testcases", [])
+            for i, testcase in enumerate(public_testcases[:3], 1):
+                try:
+                    input_data = base64.b64decode(testcase.get("input_b64", "")).decode('utf-8').strip()
+                    expected_output = base64.b64decode(testcase.get("correct_b64", "")).decode('utf-8').strip()
+                    test_cases.append((input_data, expected_output, f"Public {i}"))
+                except:
+                    continue
+        
+        if not test_cases:
+            return ""
+        
+        # Build test case information for step 1
+        test_case_info = "📋 EXAMPLE TEST CASES (showing expected input/output format):\n"
+        test_case_info += "=" * 60 + "\n\n"
+        
+        for input_data, expected_output, case_type in test_cases:
+            test_case_info += f"{case_type} Test Case:\n"
+            test_case_info += f"Input:\n{input_data}\n\n"
+            test_case_info += f"Expected Output:\n{expected_output}\n\n"
+            test_case_info += "-" * 40 + "\n\n"
+        
+        test_case_info += "🎯 CRITICAL: Your solution must produce EXACTLY the output format shown above.\n"
+        test_case_info += "Pay close attention to spacing, separators, and line breaks.\n"
+        
+        return test_case_info
 
     def _create_step2_prompt(self, step1_response: str, compiler_id: str, problem_info: Dict[str, Any] = None) -> str:
         """Create prompt for step 2: exact formatting"""
