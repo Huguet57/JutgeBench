@@ -36,6 +36,7 @@ class SolverConfig(BaseModel):
     max_generation_attempts: int = 3
     enable_local_testing: bool = True
     log_level: str = "INFO"
+    accepted_verdicts: list[str] = ["AC", "PE"]  # Verdicts considered as correct answers
 
 
 class Config(BaseModel):

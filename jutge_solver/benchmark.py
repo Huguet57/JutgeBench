@@ -53,8 +53,10 @@ class BenchmarkResult:
         self.language = None
         self.submission_details = None  # For storing compiler output, test case results, etc.
         
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self, accepted_verdicts=None) -> Dict[str, Any]:
         """Convert result to dictionary"""
+        if accepted_verdicts is None:
+            accepted_verdicts = ["AC", "PE"]
         return {
             "model_name": self.model_name,
             "problem_id": self.problem_id,
@@ -67,7 +69,7 @@ class BenchmarkResult:
             "tokens_used": self.tokens_used,
             "error": self.error,
             "language": self.language,
-            "success": self.verdict in ["AC", "PE"],
+            "success": self.verdict in accepted_verdicts,
             "solution_code": self.solution_code,  # Add the generated code for debugging
             "submission_details": self.submission_details,  # Compiler output, test results, etc.
             "timestamp": datetime.now().isoformat()
@@ -301,7 +303,7 @@ def benchmark_single_problem(model_config: AIModelConfig, problem_id: str, jutge
                 except Exception as e:
                     logger.debug(f"Could not fetch submission details: {e}")
                 
-                if verdict in ["AC", "PE"]:
+                if verdict in self.jutge_config.solver.accepted_verdicts:
                     break
                     
             except Exception as e:
@@ -423,7 +425,7 @@ class AIModelBenchmark:
         full_results = {
             "problem_set": problem_set_name,
             "config": self.benchmark_config.model_dump(),
-            "results": [r.to_dict() for r in self.results],
+            "results": [r.to_dict(self.jutge_config.solver.accepted_verdicts) for r in self.results],
             "summary": summary,
             "benchmark_time": total_time
         }
@@ -573,7 +575,7 @@ class AIModelBenchmark:
                         verdict = self._wait_for_verdict(problem_id, submission_id)
                         result.verdict = verdict
                         
-                        if verdict in ["AC", "PE"]:
+                        if verdict in self.jutge_config.solver.accepted_verdicts:
                             break
                             
                     except Exception as e:
@@ -631,7 +633,7 @@ class AIModelBenchmark:
             stats["total_time"] += result.total_time
             stats["total_tokens"] += result.tokens_used
             
-            if result.verdict in ["AC", "PE"]:
+            if result.verdict in self.jutge_config.solver.accepted_verdicts:
                 stats["solved"] += 1
             elif result.error:
                 stats["errors"] += 1
@@ -664,7 +666,7 @@ class AIModelBenchmark:
         data = {
             "problem_set": problem_set_name,
             "config": self.benchmark_config.model_dump(),
-            "results": [r.to_dict() for r in self.results],
+            "results": [r.to_dict(self.jutge_config.solver.accepted_verdicts) for r in self.results],
             "summary": self._generate_summary(0)
         }
         

@@ -9,12 +9,17 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 from rich.syntax import Syntax
+from jutge_solver.config import Config
 
 console = Console()
 
 
 def view_results(filename: str):
     """View benchmark results from a JSON file"""
+    
+    # Load configuration for accepted verdicts
+    config = Config.load_from_env()
+    accepted_verdicts = config.solver.accepted_verdicts
     
     with open(filename, 'r') as f:
         data = json.load(f)
@@ -42,7 +47,7 @@ def view_results(filename: str):
         table.add_column("Error")
         
         for result in results:
-            verdict_style = "green" if result['verdict'] in ["AC", "PE"] else "red" if result['verdict'] else "yellow"
+            verdict_style = "green" if result['verdict'] in accepted_verdicts else "red" if result['verdict'] else "yellow"
             table.add_row(
                 result['problem_id'],
                 f"[{verdict_style}]{result['verdict'] or 'N/A'}[/{verdict_style}]",
@@ -53,7 +58,7 @@ def view_results(filename: str):
         console.print(table)
         
         # Show failed submissions with details
-        failed = [r for r in results if r['verdict'] not in ["AC", "PE"] or r['error']]
+        failed = [r for r in results if r['verdict'] not in accepted_verdicts or r['error']]
         if failed:
             console.print(f"\n[yellow]Failed/Error Details for {model_name}:[/yellow]")
             
