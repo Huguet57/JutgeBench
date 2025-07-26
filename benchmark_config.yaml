@@ -247,9 +247,9 @@ problem_sets:
     - "P30170_en"   # Repeated words
 
   custom_problems:
-    - "P89265_en"   # Intervals (3)
-    - "P58294_en"   # The answer
-    - "P34279_en"   # Add one second
+    - "P98960_en"   # Uppercase and lowercase letters
+    - "P61634_en"   # Leap years
+    - "P42042_en"   # Classification of characters (1)
 
   learning_to_program_1:
     - "P68688_en"
@@ -457,6 +457,7 @@ problem_sets:
     - "P12284_en"
 
 # Benchmark settings
+default_language: "G++17"  # Default programming language for benchmarks
 max_attempts_per_problem: 1
 timeout_per_problem: 300  # 5 minutes
 retry_on_failure: true

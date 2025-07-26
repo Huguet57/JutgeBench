@@ -63,7 +63,7 @@ Examples:
     benchmark_parser.add_argument('--config', help='Benchmark config file path')
     benchmark_parser.add_argument('--report', '-r', choices=['json', 'csv', 'html'], default='json', help='Report format')
     benchmark_parser.add_argument('--parallel', '-p', action='store_true', help='Run models in parallel')
-    benchmark_parser.add_argument('--language', '-l', default='Python3', help='Programming language to use for solutions (e.g., Python3, G++17)')
+    benchmark_parser.add_argument('--language', '-l', default=None, help='Programming language to use for solutions (e.g., Python3, G++17). If not specified, uses default_language from config.')
     
     args = parser.parse_args()
     
@@ -201,9 +201,12 @@ def handle_benchmark_command(args):
     )
     
     try:
+        # Use default language from config if not specified
+        language = args.language or benchmark_config.default_language
+        
         # Run benchmark
         console.print(f"\n[blue]Running benchmark on '{args.problem_set}' problem set[/blue]")
-        results = benchmark.run_benchmark(args.problem_set, args.language)
+        results = benchmark.run_benchmark(args.problem_set, language)
         
         # Display summary
         display_benchmark_summary(results)
