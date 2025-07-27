@@ -247,8 +247,19 @@ problem_sets:
     - "P30170_en"   # Repeated words
 
   custom_problems:
+    - "P98577_en"
+    - "P67171_en"
+    - "P92845_en"
+    - "P14130_en"
+    - "P99133_en"
+    - "P90664_en"
+    - "P66257_en"
+    - "P65538_en"
     - "P30170_en"
-    - "P70093_en"
+    - "P35941_en"
+    - "P26100_en"
+    - "P27283_en"
+    - "P91173_en"
     - "P12284_en"
 
   learning_to_program_1:
@@ -455,6 +466,40 @@ problem_sets:
     - "P27283_en"
     - "P91173_en"
     - "P12284_en"
+
+  compilable_problems:
+    - "P98577_en"   # AC (Gemini), WA (GPT)
+    - "P78548_en"   # AC (both)
+    - "P99133_en"   # AC (both)
+    - "P71310_en"   # AC (Gemini)
+    - "P11725_en"   # AC (Gemini)
+    - "P92845_en"   # AC (Gemini)
+    - "P63414_en"   # AC (Gemini)
+    - "P87920_en"   # AC (Gemini)
+    - "P28318_en"   # AC (Gemini)
+    - "P73039_en"   # AC (both)
+    - "P52233_en"   # AC (both)
+    - "P99555_en"   # AC (Gemini)
+    - "P16893_en"   # AC (both)
+    - "P56358_en"   # AC (both)
+    - "P90532_en"   # AC (both)
+    - "P29094_en"   # AC (Gemini)
+    - "P81602_en"   # AC (Gemini)
+    - "P89124_en"   # AC (Gemini)
+    - "P90664_en"   # AC (Gemini)
+    - "P66257_en"   # AC (both)
+    - "P26100_en"   # AC (both)
+    - "P91173_en"   # AC (both)
+    - "P12284_en"   # AC (both)
+    - "P87801_en"   # WA (Gemini), AC (GPT)
+    - "P48763_en"   # AC (GPT)
+    - "P34438_en"   # AC (GPT)
+    - "P65538_en"   # AC (GPT)
+    - "P30170_en"   # AC (GPT)
+    - "P67171_en"   # WA (both)
+    - "P44243_en"   # WA (both)
+    - "P46584_en"   # WA (both)
+    - "P27283_en"   # PE (Gemini), WA (GPT)
 
 # Benchmark settings
 default_language: "G++17"  # Default programming language for benchmarks
