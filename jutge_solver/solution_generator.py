@@ -1393,10 +1393,10 @@ Output ONLY the clean, executable {language_name} code with no explanations, com
             # Check if response looks like raw C++ code
             response_lower = response.lower().strip()
             if (response_lower.startswith('#include') and 
-                'using namespace std' in response and 
                 'int main(' in response and
                 '```' not in response):  # No markdown blocks
                 # This looks like raw C++ code, use specific extractor
+                # Note: We don't require 'using namespace std' as code might use std:: prefix
                 extracted = self._extract_cpp_code(response)
                 if extracted:
                     return extracted
